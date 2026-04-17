@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SkyAI</string>
+    <string name="search_title">SkyAI Flight Finder</string>
+    <string name="where_to_go">Where do you want to go?</string>
+    <string name="search_flights">Search Flights</string>
+    <string name="show_details">Show Details</string>
+    <string name="hide_details">Hide Details</string>
+    <string name="origin">From</string>
+    <string name="destination">To</string>
+    <string name="depart">Depart</string>
+    <string name="return_date">Return</string>
+    <string name="roundtrip">Roundtrip</string>
+    <string name="one_way">One-way</string>
+    <string name="adults">Adults</string>
+    <string name="children">Children</string>
+    <string name="infants">Infants</string>
+    <string name="cabin_class">Cabin Class</string>
+    <string name="direct_only">Direct flights only</string>
+    <string name="flight_details">Flight Details</string>
+    <string name="price_intelligence">Price Intelligence</string>
+    <string name="book_now">Book Now</string>
+    <string name="set_alert">Set Alert</string>
+    <string name="no_flights">No flights found</string>
+    <string name="adjust_search">Try adjusting your search criteria</string>
+</resources>
