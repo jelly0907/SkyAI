@@ -36,12 +36,12 @@ struct ProfileView: View {
 
                     Text("SkyAI v1.0.0")
                         .font(.system(size: 12))
-                        .foregroundColor(Color(.systemGray4))
+                        .foregroundColor(Color(uiColor: .systemGray4))
                         .padding(.bottom, 20)
                 }
                 .padding(.top, 16)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -172,7 +172,7 @@ struct ProfileView: View {
             }
         }
         .padding(16)
-        .background(Color(.systemBackground))
+        .background(Color(uiColor: .systemBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
         .padding(.horizontal, 20)
@@ -354,7 +354,7 @@ struct ProfileSectionCard<Content: View>: View {
             VStack(spacing: 0) {
                 content()
             }
-            .background(Color(.systemBackground))
+            .background(Color(uiColor: .systemBackground))
             .cornerRadius(16)
             .shadow(color: .black.opacity(0.04), radius: 4, y: 1)
         }
@@ -405,7 +405,7 @@ struct LabelDimensionCell: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemGroupedBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
         .cornerRadius(10)
     }
 }

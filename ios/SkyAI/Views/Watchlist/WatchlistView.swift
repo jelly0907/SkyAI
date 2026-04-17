@@ -46,7 +46,7 @@ struct WatchlistView: View {
                     }
                 }
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Watchlist")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -74,7 +74,7 @@ struct WatchlistView: View {
             Spacer()
             Image(systemName: "bell.slash.circle.fill")
                 .font(.system(size: 64))
-                .foregroundColor(Color(.systemGray4))
+                .foregroundColor(Color(uiColor: .systemGray4))
 
             VStack(spacing: 8) {
                 Text("No Price Watches Yet")
@@ -234,7 +234,7 @@ struct WatchCard: View {
                 .background(Color.blue.opacity(0.05))
             }
         }
-        .background(Color(.systemBackground))
+        .background(Color(uiColor: .systemBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
         .opacity(watch.status == .paused ? 0.6 : 1.0)
@@ -314,7 +314,7 @@ struct PastAlertRow: View {
             }
         }
         .padding(14)
-        .background(Color(.systemBackground))
+        .background(Color(uiColor: .systemBackground))
         .cornerRadius(14)
         .shadow(color: .black.opacity(0.04), radius: 4, y: 1)
     }

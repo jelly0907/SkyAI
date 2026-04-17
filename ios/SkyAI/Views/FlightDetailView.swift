@@ -66,7 +66,7 @@ struct FlightDetailView: View {
                                     .foregroundColor(primaryColor)
                             }
                             .padding(12)
-                            .background(Color(.systemGray6))
+                            .background(Color(uiColor: .systemGray6))
                             .cornerRadius(8)
                         }
                         .padding(16)
@@ -94,7 +94,7 @@ struct FlightDetailView: View {
                                     GeometryReader { geo in
                                         ZStack(alignment: .leading) {
                                             RoundedRectangle(cornerRadius: 4)
-                                                .fill(Color(.systemGray6))
+                                                .fill(Color(uiColor: .systemGray6))
 
                                             RoundedRectangle(cornerRadius: 4)
                                                 .fill(accentColor)
@@ -242,7 +242,7 @@ struct FlightDetailView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(16)
-                            .background(Color(.systemGray6))
+                            .background(Color(uiColor: .systemGray6))
                             .foregroundColor(primaryColor)
                             .cornerRadius(12)
                         }
@@ -398,7 +398,7 @@ struct DetailRowView: View {
             Spacer()
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color(uiColor: .systemGray6))
         .cornerRadius(8)
     }
 }

@@ -51,7 +51,7 @@ struct ResultsView: View {
                     }
                 }
                 .padding(16)
-                .background(Color(.systemGray6))
+                .background(Color(uiColor: .systemGray6))
 
                 // Sort Picker
                 Picker("Sort", selection: Binding(
@@ -127,7 +127,7 @@ struct SkeletonLoadingView: View {
         VStack(spacing: 12) {
             ForEach(0..<5, id: \.self) { _ in
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemGray6))
+                    .fill(Color(uiColor: .systemGray6))
                     .frame(height: 140)
                     .shimmer()
             }
@@ -225,7 +225,7 @@ struct ParetoBarView: View {
             }
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color(uiColor: .systemGray6))
     }
 }
 

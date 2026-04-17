@@ -175,7 +175,7 @@ struct BudgetOptionRow: View {
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22))
-                    .foregroundColor(isSelected ? accentColor : Color(.systemGray4))
+                    .foregroundColor(isSelected ? accentColor : Color(uiColor: .systemGray4))
             }
             .padding(14)
             .background(

@@ -53,12 +53,12 @@ struct HomeDealCardView: View {
                         // Flight line with stop dots
                         HStack(spacing: 0) {
                             Rectangle()
-                                .fill(Color(.systemGray4))
+                                .fill(Color(uiColor: .systemGray4))
                                 .frame(height: 1)
 
                             if card.stops > 0 {
                                 Circle()
-                                    .fill(Color(.systemGray3))
+                                    .fill(Color(uiColor: .systemGray3))
                                     .frame(width: 6, height: 6)
                             } else {
                                 Image(systemName: "airplane")
@@ -68,7 +68,7 @@ struct HomeDealCardView: View {
                             }
 
                             Rectangle()
-                                .fill(Color(.systemGray4))
+                                .fill(Color(uiColor: .systemGray4))
                                 .frame(height: 1)
                         }
 
@@ -132,7 +132,7 @@ struct HomeDealCardView: View {
                 .padding(.horizontal, 14)
                 .padding(.bottom, 14)
             }
-            .background(Color(.systemBackground))
+            .background(Color(uiColor: .systemBackground))
             .cornerRadius(16)
             .shadow(color: Color.black.opacity(0.07), radius: 8, x: 0, y: 3)
         }
@@ -191,7 +191,7 @@ struct HomeDealCardView: View {
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .background(Color(.systemGray6))
+                    .background(Color(uiColor: .systemGray6))
                     .cornerRadius(20)
             }
         }
@@ -203,10 +203,10 @@ struct HomeDealCardView: View {
         switch label {
         case .steal:     return Color(red: 1.0, green: 0.42, blue: 0.21)
         case .greatDeal: return .green
-        case .fair:      return Color(.systemGray)
+        case .fair:      return Color(uiColor: .systemGray)
         case .expensive: return .orange
         case .overpriced: return .red
-        case .unknown:   return Color(.systemGray4)
+        case .unknown:   return Color(uiColor: .systemGray4)
         }
     }
 

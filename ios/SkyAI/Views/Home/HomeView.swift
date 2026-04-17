@@ -36,7 +36,7 @@ struct HomeView: View {
                 }
                 .padding(.bottom, 32)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color(uiColor: .systemGroupedBackground))
             .refreshable { await viewModel.refresh() }
             .navigationBarHidden(true)
             .navigationDestination(for: SearchRequest.self) { request in
@@ -101,7 +101,7 @@ struct HomeView: View {
                 .foregroundColor(accentColor)
         }
         .padding(14)
-        .background(Color(.systemBackground))
+        .background(Color(uiColor: .systemBackground))
         .cornerRadius(14)
         .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
         .padding(.horizontal, 20)
@@ -231,7 +231,7 @@ struct RouteChipView: View {
             }
             .frame(width: 110, height: 120)
             .padding(14)
-            .background(Color(.systemBackground))
+            .background(Color(uiColor: .systemBackground))
             .cornerRadius(16)
             .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
         }
@@ -246,7 +246,7 @@ struct SkeletonCard: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: 16)
-            .fill(Color(.systemGray5))
+            .fill(Color(uiColor: .systemGray5))
             .frame(height: 160)
             .opacity(opacity)
             .onAppear {

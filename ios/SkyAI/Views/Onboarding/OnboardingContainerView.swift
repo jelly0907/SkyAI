@@ -35,7 +35,7 @@ struct OnboardingContainerView: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color(.systemGray5))
+                            .fill(Color(uiColor: .systemGray5))
                             .frame(height: 6)
 
                         RoundedRectangle(cornerRadius: 4)
@@ -52,7 +52,7 @@ struct OnboardingContainerView: View {
             .padding(.horizontal, 24)
             .padding(.top, 20)
             .padding(.bottom, 16)
-            .background(Color(.systemBackground))
+            .background(Color(uiColor: .systemBackground))
 
             // ── Step Content ───────────────────────────────────────────────
             TabView(selection: $currentStep) {
@@ -81,7 +81,7 @@ struct OnboardingContainerView: View {
                         .foregroundColor(primaryColor)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(Color(.systemGray6))
+                        .background(Color(uiColor: .systemGray6))
                         .cornerRadius(14)
                     }
                     .transition(.opacity)
@@ -105,9 +105,9 @@ struct OnboardingContainerView: View {
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 20)
-            .background(Color(.systemBackground))
+            .background(Color(uiColor: .systemBackground))
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
     private func finishOnboarding() {

@@ -282,5 +282,5 @@ struct RouteSegmentView: View {
         ))
     }
     .padding(16)
-    .background(Color(.systemGray6))
+    .background(Color(uiColor: .systemGray6))
 }
