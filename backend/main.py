@@ -20,8 +20,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from amadeus_client import AmadeusClient
+from db.database import init_db
 from duffel_client import DuffelClient
 from routes.search import router as search_router
+from routes.watch import router as watch_router
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -49,6 +51,15 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start and cleanly shut down shared resources."""
+
+    # Ensure DB tables exist. In prod we use Alembic migrations instead
+    # (see backend/DEV_TO_PROD_MIGRATION.md); create_all is fine for dev.
+    await init_db()
+    logger.info(
+        "✅ Database initialized (DATABASE_URL=%s)",
+        os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./skyai.db"),
+    )
+
     if FLIGHT_PROVIDER == "duffel":
         if not DUFFEL_API_KEY:
             logger.warning("⚠️  DUFFEL_API_KEY not set. Add it to your .env file.")
@@ -104,6 +115,7 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────────────────────────
 
 app.include_router(search_router)
+app.include_router(watch_router)
 
 
 # ── Health Check ──────────────────────────────────────────────────────────────

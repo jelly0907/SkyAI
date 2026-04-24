@@ -16,10 +16,14 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request, status
 
+from db.database import AsyncSessionLocal
+from db.models_sql import PriceObservation
+from db.repositories import ObservationRepo
 from models import (
-    CabinClass, IntentRequest, IntentResponse, SearchRequest,
+    CabinClass, FlightOffer, IntentRequest, IntentResponse, SearchRequest,
     SearchResponse, TripType,
 )
+from price_intel.provider import get_price_intel_engine
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/search", tags=["search"])
@@ -259,11 +263,54 @@ async def parse_intent(body: IntentRequest) -> IntentResponse:
     )
 
 
+async def _log_observations(
+    offers: list[FlightOffer], req: SearchRequest, provider: str
+) -> None:
+    """Persist a PriceObservation per offer. Never raises — logging must never
+    break the search response."""
+    try:
+        from datetime import datetime, time, timezone as _tz
+        dep_dt = datetime.combine(req.departure_date, time.min, tzinfo=_tz.utc)
+        ret_dt = (
+            datetime.combine(req.return_date, time.min, tzinfo=_tz.utc)
+            if req.return_date else None
+        )
+
+        rows: list[PriceObservation] = []
+        for o in offers:
+            if not o.itineraries:
+                continue
+            first_seg = o.itineraries[0].segments[0]
+            rows.append(PriceObservation(
+                origin=req.origin.upper(),
+                destination=req.destination.upper(),
+                departure_date=dep_dt,
+                return_date=ret_dt,
+                airline=first_seg.carrier_code,
+                flight_number=first_seg.flight_number,
+                cabin_class=req.cabin_class.value,
+                price_usd=o.price.total_usd,
+                stops=o.total_stops,
+                total_duration_minutes=sum(i.total_duration_minutes for i in o.itineraries),
+                source=o.source or provider,
+                price_label=(o.price_intelligence.price_label.value
+                             if o.price_intelligence else None),
+                seats_remaining=o.seats_remaining,
+            ))
+        if not rows:
+            return
+        async with AsyncSessionLocal() as session:
+            await ObservationRepo(session).bulk_log(rows)
+    except Exception as e:       # noqa: BLE001
+        logger.warning("Failed to log price observations: %s", e)
+
+
 @router.post("/flights", response_model=SearchResponse, summary="Search for flights")
 async def search_flights(body: SearchRequest, request: Request) -> SearchResponse:
     """
     Executes a flight search against the configured provider (mock / Duffel / Amadeus).
-    Returns enriched FlightOffer list sorted by relevance.
+    Returns offers enriched with Price Intelligence and logs each price point
+    to the price history database for future ML training.
     """
     provider = getattr(request.app.state, "provider", "mock")
 
@@ -280,6 +327,15 @@ async def search_flights(body: SearchRequest, request: Request) -> SearchRespons
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Flight search failed: {str(e)}",
         )
+
+    # Run offers through the Price Intelligence engine (idempotent — overrides
+    # any pre-existing intelligence with the current engine's classification).
+    engine = get_price_intel_engine()
+    offers = engine.enrich_offers(offers, body.departure_date)
+
+    # Log every offer as a price observation (fire-and-forget; never fails the
+    # response).
+    await _log_observations(offers, body, provider)
 
     return SearchResponse(
         query_id=str(uuid.uuid4()),
