@@ -15,7 +15,7 @@ import logging
 from datetime import date, datetime, time, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.database import get_session
@@ -176,16 +176,18 @@ async def get_watch(
 @router.delete(
     "/{watch_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
     summary="Delete (cancel) a watch",
 )
 async def delete_watch(
     watch_id: str,
     session: AsyncSession = Depends(get_session),
-) -> None:
+):
     repo = WatchRepo(session)
     ok = await repo.delete(watch_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Watch not found.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

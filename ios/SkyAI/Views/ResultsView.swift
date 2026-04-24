@@ -13,47 +13,37 @@ struct ResultsView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                // Header
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Button(action: { dismiss() }) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(primaryColor)
-                        }
+                // Header — compact single-row layout: back chevron on the
+                // left, route + date/pax stacked as a tight two-line block
+                // next to it. Keeps the header under ~60pt tall.
+                HStack(spacing: 12) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(primaryColor)
+                    }
 
-                        Spacer()
-
+                    VStack(alignment: .leading, spacing: 2) {
                         Text("\(searchRequest.originCode) → \(searchRequest.destinationCode)")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
 
-                        Spacer()
-
-                        Image(systemName: "checkmark.circle")
-                            .font(.system(size: 16))
-                            .foregroundColor(.green)
-                            .opacity(0)
+                        HStack(spacing: 6) {
+                            Text(formatDate(searchRequest.departureDate))
+                            Text("·")
+                            Text("\(searchRequest.adults) \(searchRequest.adults == 1 ? "Adult" : "Adults")")
+                        }
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
                     }
 
-                    HStack(spacing: 8) {
-                        Text(formatDate(searchRequest.departureDate))
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
-
-                        Divider()
-                            .frame(maxWidth: 20)
-
-                        Text("\(searchRequest.adults) \(searchRequest.adults == 1 ? "Adult" : "Adults")")
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
-
-                        Spacer()
-                    }
+                    Spacer()
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
                 .background(Color(uiColor: .systemGray6))
 
-                // Sort Picker
+                // Sort Picker — tighter padding so it sits close to header.
                 Picker("Sort", selection: Binding(
                     get: { viewModel.sortOption },
                     set: { viewModel.sort(by: $0) }
@@ -63,7 +53,8 @@ struct ResultsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
 
                 // Content
                 if viewModel.isLoading {
@@ -81,17 +72,23 @@ struct ResultsView: View {
                     EmptyStateView()
                 } else {
                     ZStack(alignment: .bottom) {
-                        LazyVStack(spacing: 12) {
-                            ForEach(viewModel.offers) { offer in
-                                NavigationLink(destination: FlightDetailView(offer: offer)) {
-                                    FlightCardView(offer: offer)
+                        // Wrap the offers list in a ScrollView so long lists
+                        // scroll instead of getting clipped off-screen.
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(viewModel.offers) { offer in
+                                    NavigationLink(destination: FlightDetailView(offer: offer)) {
+                                        FlightCardView(offer: offer)
+                                    }
                                 }
-                            }
 
-                            Spacer()
-                                .frame(height: 100)
+                                // Leave room at the bottom so the Pareto
+                                // bar doesn't cover the last card.
+                                Spacer()
+                                    .frame(height: 100)
+                            }
+                            .padding(16)
                         }
-                        .padding(16)
 
                         // Pareto Bar
                         if let cheapest = viewModel.offers.min(by: { $0.price < $1.price }),
@@ -108,7 +105,13 @@ struct ResultsView: View {
 
                 Spacer()
             }
+            // Hide the system nav bar entirely so our custom Header (with
+            // the back chevron) sits at the top of the safe area. Using
+            // just .navigationBarBackButtonHidden(true) leaves an empty
+            // nav bar taking vertical space, which makes the Header look
+            // cut off.
             .navigationBarBackButtonHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
         }
         .task {
             await viewModel.load(request: searchRequest)

@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import random
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 
 from models import (
@@ -467,7 +467,11 @@ def generate_mock_offers(req: SearchRequest) -> list[FlightOffer]:
             price = round(price_raw * req.adults, 2)
             fn = f"{carrier}{rng.randint(1, 999):03d}"
             aircraft = rng.choice(["Boeing 787-9", "Boeing 777-300ER", "Airbus A350-900"])
-            ret_dt = req.return_date
+            # req.return_date is a `date`; _make_offer expects a `datetime`.
+            ret_dt = (
+                datetime.combine(req.return_date, time.min, tzinfo=timezone.utc)
+                if req.return_date else None
+            )
 
             offers.append(_make_offer(
                 origin, destination, dep_dt, ret_dt,
@@ -494,7 +498,11 @@ def generate_mock_offers(req: SearchRequest) -> list[FlightOffer]:
             price = round(price_raw * req.adults, 2)
             fn = f"{carrier}{rng.randint(1, 999):03d}"
             hub = layover_hubs[i % len(layover_hubs)] if layover_hubs else "ORD"
-            ret_dt = req.return_date
+            # req.return_date is a `date`; _make_offer expects a `datetime`.
+            ret_dt = (
+                datetime.combine(req.return_date, time.min, tzinfo=timezone.utc)
+                if req.return_date else None
+            )
 
             offers.append(_make_offer(
                 origin, destination, dep_dt, ret_dt,
@@ -515,7 +523,11 @@ def generate_mock_offers(req: SearchRequest) -> list[FlightOffer]:
             price = round(price_raw * req.adults, 2)
             fn = f"{budget_carrier}{rng.randint(1, 999):03d}"
             hub = route.get("layover_hubs_1stop", ["ORD"])[0]
-            ret_dt = req.return_date
+            # req.return_date is a `date`; _make_offer expects a `datetime`.
+            ret_dt = (
+                datetime.combine(req.return_date, time.min, tzinfo=timezone.utc)
+                if req.return_date else None
+            )
 
             offers.append(_make_offer(
                 origin, destination, dep_dt, ret_dt,
