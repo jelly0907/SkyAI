@@ -10,6 +10,5 @@ cachetools==5.5.0
 # See backend/DEV_TO_PROD_MIGRATION.md for the prod swap checklist.
 SQLAlchemy==2.0.36
 aiosqlite==0.20.0
-greenlet==3.1.1            # required by SQLAlchemy async; not always auto-installed on Py 3.9 / ARM
 # asyncpg==0.30.0          # uncomment when moving to Postgres
 # alembic==1.13.3          # uncomment before first prod deploy (migrations)

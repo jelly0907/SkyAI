@@ -41,8 +41,7 @@ DEPENDENCIES:
 - No external packages required
 
 BACKEND INTEGRATION:
-- Base URL: http://192.168.86.144:8000 (Mac LAN IP — update when network changes)
-- Simulator alt: http://localhost:8000
+- Base URL: http://localhost:8000
 - POST /search/intent - Parse natural language query
 - POST /search/flights - Search with SearchRequest
 - JSON uses snake_case (auto-converted by JSONEncoder/Decoder)
