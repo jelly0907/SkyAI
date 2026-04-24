@@ -15,13 +15,16 @@ import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from amadeus_client import AmadeusClient
+from db.database import init_db
 from duffel_client import DuffelClient
 from routes.search import router as search_router
+from routes.watch import router as watch_router
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -49,6 +52,15 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start and cleanly shut down shared resources."""
+
+    # Ensure DB tables exist. In prod we use Alembic migrations instead
+    # (see backend/DEV_TO_PROD_MIGRATION.md); create_all is fine for dev.
+    await init_db()
+    logger.info(
+        "✅ Database initialized (DATABASE_URL=%s)",
+        os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./skyai.db"),
+    )
+
     if FLIGHT_PROVIDER == "duffel":
         if not DUFFEL_API_KEY:
             logger.warning("⚠️  DUFFEL_API_KEY not set. Add it to your .env file.")
@@ -104,6 +116,28 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────────────────────────
 
 app.include_router(search_router)
+app.include_router(watch_router)
+
+
+# ── Validation-error logger ───────────────────────────────────────────────────
+# Logs the failing payload + exact Pydantic errors for every 422. Keep this on
+# during dev so schema drift between clients and backend is obvious.
+
+@app.exception_handler(RequestValidationError)
+async def log_validation_error(request: Request, exc: RequestValidationError):
+    try:
+        body_bytes = await request.body()
+        body_preview = body_bytes.decode("utf-8", errors="replace")[:2000]
+    except Exception:
+        body_preview = "<unreadable>"
+    logger.warning(
+        "422 on %s %s\n  errors: %s\n  body: %s",
+        request.method,
+        request.url.path,
+        exc.errors(),
+        body_preview,
+    )
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 
 # ── Health Check ──────────────────────────────────────────────────────────────

@@ -8,11 +8,16 @@ struct FlightDetailView: View {
     private let accentColor = Color(red: 1.0, green: 0.42, blue: 0.21)
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 12) {
+        // Note: do NOT wrap this view in its own NavigationStack. This view
+        // is pushed into SearchView's NavigationStack via a NavigationLink,
+        // and nesting a second NavigationStack breaks the parent's
+        // navigationDestination(for: SearchRequest.self) lookup after
+        // popping back — the next programmatic push silently fails with
+        // "no matching navigationDestination declaration visible".
+        ScrollView {
+            VStack(spacing: 20) {
+                // Header
+                VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Button(action: { dismiss() }) {
                                 HStack(spacing: 4) {
@@ -66,7 +71,7 @@ struct FlightDetailView: View {
                                     .foregroundColor(primaryColor)
                             }
                             .padding(12)
-                            .background(Color(.systemGray6))
+                            .background(Color(uiColor: .systemGray6))
                             .cornerRadius(8)
                         }
                         .padding(16)
@@ -94,7 +99,7 @@ struct FlightDetailView: View {
                                     GeometryReader { geo in
                                         ZStack(alignment: .leading) {
                                             RoundedRectangle(cornerRadius: 4)
-                                                .fill(Color(.systemGray6))
+                                                .fill(Color(uiColor: .systemGray6))
 
                                             RoundedRectangle(cornerRadius: 4)
                                                 .fill(accentColor)
@@ -242,16 +247,15 @@ struct FlightDetailView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(16)
-                            .background(Color(.systemGray6))
+                            .background(Color(uiColor: .systemGray6))
                             .foregroundColor(primaryColor)
                             .cornerRadius(12)
                         }
                     }
                     .padding(20)
                 }
-            }
-            .navigationBarBackButtonHidden(true)
         }
+        .navigationBarBackButtonHidden(true)
     }
 
     private var trendIcon: String {
@@ -398,47 +402,66 @@ struct DetailRowView: View {
             Spacer()
         }
         .padding(12)
-        .background(Color(.systemGray6))
+        .background(Color(uiColor: .systemGray6))
         .cornerRadius(8)
     }
 }
 
 #Preview {
     FlightDetailView(offer: FlightOffer(
-        id: "1",
-        outbound: Itinerary(
-            segments: [
-                Segment(
-                    departureAirport: "SFO",
-                    departureTime: Date(),
-                    arrivalAirport: "NRT",
-                    arrivalTime: Date().addingTimeInterval(38000),
-                    flightNumber: "NH107",
-                    airlineCode: "NH",
-                    aircraft: "787",
-                    durationMinutes: 630,
-                    stops: 0
-                )
-            ],
-            durationMinutes: 630
+        offerId: "1",
+        source: "mock",
+        itineraries: [
+            Itinerary(
+                segments: [
+                    Segment(
+                        origin: "SFO",
+                        destination: "NRT",
+                        departureAt: Date(),
+                        arrivalAt: Date().addingTimeInterval(38000),
+                        carrierCode: "NH",
+                        flightNumber: "NH107",
+                        aircraftCode: "787",
+                        durationMinutes: 630,
+                        cabin: .economy
+                    )
+                ],
+                totalDurationMinutes: 630,
+                stops: 0
+            )
+        ],
+        priceBreakdown: PriceBreakdown(
+            totalUsd: 800,
+            baseFareUsd: 650,
+            taxesUsd: 100,
+            feesUsd: 50,
+            perAdultUsd: 800
         ),
-        inbound: nil,
-        priceBreakdown: PriceBreakdown(basePrice: 650, taxes: 100, fees: 50, currency: "USD"),
-        baggageInfo: BaggageInfo(carryon: "1 bag", checkedBags: 1, checkedWeight: "23kg"),
-        fareConditions: FareConditions(refundable: true, changeable: true, minStayDays: nil),
+        baggageInfo: BaggageInfo(
+            checkedBagsIncluded: 1,
+            carryOnIncluded: true,
+            checkedBagWeightKg: 23
+        ),
+        fareConditions: FareConditions(
+            isRefundable: true,
+            changeFeeUsd: 0,
+            fareClass: "Y"
+        ),
+        seatsRemaining: 5,
         priceIntelligence: PriceIntelligence(
             priceLabel: .steal,
-            percentileRank: 0.9,
-            historicalAverage: 850,
-            historicalMin: 600,
-            historicalMax: 1200,
-            savingsAmount: 200,
-            savingsPercent: 19,
+            pricePercentile: 90,
+            savingsVsMedianUsd: 200,
+            savingsPct: 19,
             trend: .falling,
-            recommendedAction: .buyNow,
-            explanation: "Great price right now"
+            forecast7dUsd: nil,
+            forecast14dUsd: nil,
+            action: .buyNow,
+            actionReason: "Great price right now",
+            badgeText: "STEAL",
+            confidence: 0.9
         ),
         bookingUrl: "https://example.com",
-        availableSeats: 5
+        lastTicketingDate: nil
     ))
 }

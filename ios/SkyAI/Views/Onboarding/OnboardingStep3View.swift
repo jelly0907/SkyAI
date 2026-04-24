@@ -238,7 +238,7 @@ struct AddedProgramRow: View {
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 20))
-                    .foregroundColor(Color(.systemGray4))
+                    .foregroundColor(Color(uiColor: .systemGray4))
             }
         }
         .padding(12)

@@ -193,3 +193,75 @@ class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
     code: Optional[str] = None
+
+
+# ── Price Watch Alert Models ──────────────────────────────────────────────────
+
+class WatchCreateRequest(BaseModel):
+    """Request body for POST /watch."""
+    user_id: str = Field(..., min_length=1, max_length=64,
+                         description="Client-supplied user ID (auth comes in Phase 3).")
+    origin: str = Field(..., min_length=3, max_length=3)
+    destination: str = Field(..., min_length=3, max_length=3)
+    departure_date: date
+    return_date: Optional[date] = None
+    cabin_class: CabinClass = CabinClass.ECONOMY
+    adults: int = Field(1, ge=1, le=9)
+    max_stops: Optional[int] = Field(None, ge=0, le=3)
+    target_price_usd: Optional[float] = Field(
+        None, ge=0,
+        description="Alert fires when observed price drops to or below this.",
+    )
+    notify_on_great_deal: bool = Field(
+        True,
+        description="Also alert when our engine classifies the price STEAL or GREAT_DEAL, "
+                    "even if no target_price_usd was set.",
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_id": "demo-user",
+                "origin": "SFO",
+                "destination": "NRT",
+                "departure_date": "2026-07-15",
+                "return_date": "2026-07-25",
+                "cabin_class": "ECONOMY",
+                "adults": 1,
+                "target_price_usd": 800,
+                "notify_on_great_deal": True,
+            }
+        }
+
+
+class WatchResponse(BaseModel):
+    """Shape returned by the /watch endpoints."""
+    id: str
+    user_id: str
+    origin: str
+    destination: str
+    departure_date: date
+    return_date: Optional[date] = None
+    cabin_class: CabinClass
+    adults: int
+    max_stops: Optional[int] = None
+    target_price_usd: Optional[float] = None
+    notify_on_great_deal: bool
+    active: bool
+    created_at: datetime
+    last_checked_at: Optional[datetime] = None
+    last_price_usd: Optional[float] = None
+    last_label: Optional[PriceLabel] = None
+    triggered_at: Optional[datetime] = None
+    trigger_count: int = 0
+
+
+class WatchCheckResponse(BaseModel):
+    """Result of POST /watch/{id}/check — did the watch fire?"""
+    watch: WatchResponse
+    triggered: bool
+    best_price_usd: Optional[float] = None
+    best_label: Optional[PriceLabel] = None
+    best_offer: Optional[FlightOffer] = None
+    reason: str
+    checked_at: datetime

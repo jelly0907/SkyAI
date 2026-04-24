@@ -40,7 +40,7 @@ struct SearchView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(.systemGray6))
+                            .background(Color(uiColor: .systemGray6))
                             .cornerRadius(12)
                         }
                         .padding(20)
@@ -58,7 +58,7 @@ struct SearchView: View {
                                         .foregroundColor(.secondary)
                                 }
                                 .padding(12)
-                                .background(Color(.systemGray6))
+                                .background(Color(uiColor: .systemGray6))
                                 .cornerRadius(8)
                             }
                             .padding(.horizontal, 20)
@@ -98,7 +98,7 @@ struct SearchView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(primaryColor)
                             .padding(16)
-                            .background(Color(.systemGray6))
+                            .background(Color(uiColor: .systemGray6))
                             .cornerRadius(12)
                         }
                         .padding(.horizontal, 20)
@@ -262,7 +262,7 @@ struct StructuredFormView: View {
                 .tint(Color(red: 1.0, green: 0.42, blue: 0.21))
         }
         .padding(16)
-        .background(Color(.systemGray6))
+        .background(Color(uiColor: .systemGray6))
         .cornerRadius(12)
         .onChange(of: viewModel.searchRequest.tripType) { _ in
             viewModel.setDefaultReturnDate()
