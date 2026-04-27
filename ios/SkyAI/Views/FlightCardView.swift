@@ -47,15 +47,17 @@ struct FlightCardView: View {
 
             Divider()
 
-            // Route with times
+            // Route with times — pass the full itinerary so multi-stop
+            // trips can show first-segment origin → last-segment destination
+            // (instead of dropping every leg after the first).
             VStack(spacing: 8) {
-                RouteSegmentView(segment: offer.outbound.segments.first)
+                RouteSegmentView(itinerary: offer.outbound)
 
                 if let inbound = offer.inbound {
                     Divider()
                         .padding(.vertical, 4)
 
-                    RouteSegmentView(segment: inbound.segments.first, isReturn: true)
+                    RouteSegmentView(itinerary: inbound, isReturn: true)
                 }
             }
 
@@ -165,22 +167,36 @@ struct PriceBadgeView: View {
 }
 
 struct RouteSegmentView: View {
-    let segment: Segment?
+    let itinerary: Itinerary
     let isReturn: Bool
 
-    init(segment: Segment?, isReturn: Bool = false) {
-        self.segment = segment
+    init(itinerary: Itinerary, isReturn: Bool = false) {
+        self.itinerary = itinerary
         self.isReturn = isReturn
     }
 
+    /// First segment of the trip — provides departure airport + time.
+    private var first: Segment? { itinerary.segments.first }
+    /// Last segment of the trip — provides final arrival airport + time.
+    /// (For nonstop trips this is the same as `first`.)
+    private var last: Segment? { itinerary.segments.last }
+
+    /// Layover airports between origin and final destination — empty
+    /// for nonstops, ["LAX"] for one-stop, ["LAX","DEN"] for two-stop, etc.
+    private var stopAirports: [String] {
+        guard itinerary.segments.count > 1 else { return [] }
+        // Each segment's destination is a stop except the very last one.
+        return itinerary.segments.dropLast().map(\.arrivalAirport)
+    }
+
     var body: some View {
-        if let segment = segment {
+        if let first = first, let last = last {
             HStack(spacing: 12) {
                 VStack(alignment: .center, spacing: 2) {
-                    Text(segment.departureAirport)
+                    Text(first.departureAirport)
                         .font(.system(size: 13, weight: .semibold))
 
-                    Text(formatTime(segment.departureTime))
+                    Text(formatTime(first.departureTime))
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
@@ -200,7 +216,15 @@ struct RouteSegmentView: View {
                             .frame(maxHeight: 1)
                     }
 
-                    if isReturn {
+                    // Layover row — show airport codes inline so the user
+                    // sees the routing at a glance (e.g. "via LAX" or
+                    // "via LAX, DEN"). Falls back to "Return" for the
+                    // inbound itinerary on nonstops.
+                    if !stopAirports.isEmpty {
+                        Text("via \(stopAirports.joined(separator: ", "))")
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
+                    } else if isReturn {
                         Text("Return")
                             .font(.system(size: 9))
                             .foregroundColor(.secondary)
@@ -208,15 +232,15 @@ struct RouteSegmentView: View {
                 }
 
                 VStack(alignment: .center, spacing: 2) {
-                    Text(segment.arrivalAirport)
+                    Text(last.arrivalAirport)
                         .font(.system(size: 13, weight: .semibold))
 
                     HStack(spacing: 2) {
-                        Text(formatTime(segment.arrivalTime))
+                        Text(formatTime(last.arrivalTime))
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
 
-                        if isNextDay(departure: segment.departureTime, arrival: segment.arrivalTime) {
+                        if isNextDay(departure: first.departureTime, arrival: last.arrivalTime) {
                             Text("+1")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(.secondary)

@@ -94,6 +94,30 @@ def _resolve_date(text: str) -> Optional[date]:
         n = int(m.group(1))
         return today + timedelta(days=n if "day" in m.group(2) else n * 7)
 
+    # Weekday names — "next monday", "this friday", or bare "saturday".
+    # "this <weekday>" → the upcoming instance (today if it's that day).
+    # "next <weekday>" → the instance after that.
+    # bare weekday    → same as "this".
+    weekdays = {
+        "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+        "friday": 4, "saturday": 5, "sunday": 6,
+    }
+    m = re.search(r"(?:(next|this)\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", text)
+    if m:
+        modifier = m.group(1)  # "next", "this", or None
+        target = weekdays[m.group(2)]
+        days_ahead = (target - today.weekday()) % 7
+        if modifier == "next":
+            # Always next week's instance (skip past current week).
+            days_ahead = days_ahead or 7
+            if days_ahead < 7:
+                days_ahead += 7
+        else:
+            # "this" or bare — next occurrence; if today is the day, use today.
+            # No-op: days_ahead is already correct (0 if today).
+            pass
+        return today + timedelta(days=days_ahead)
+
     # "Month Day" or "Month Day, Year"
     for month_name, month_num in MONTH_MAP.items():
         pattern = rf"{month_name}\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s*(\d{{4}}))?"
@@ -141,11 +165,32 @@ def _parse_natural_language(query: str) -> tuple[SearchRequest, float, str]:
     confidence = 1.0
     notes = []
 
+    # Words that terminate origin/destination captures. Includes prepositions
+    # (in/on/for/from/to), date keywords (next/this/today/tomorrow), and
+    # weekday names — otherwise a query like "JFK to LHR next Friday" would
+    # greedily capture "LHR next Friday" as the destination and fail.
+    _LOC_END = (
+        r"(?:\s+to|\s+in|\s+on|\s+for|\s+from|"
+        r"\s+next|\s+this|\s+today|\s+tomorrow|"
+        r"\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|"
+        r"\s+jan(?:uary)?|\s+feb(?:ruary)?|\s+mar(?:ch)?|\s+apr(?:il)?|"
+        r"\s+may|\s+jun(?:e)?|\s+jul(?:y)?|\s+aug(?:ust)?|"
+        r"\s+sep(?:t|tember)?|\s+oct(?:ober)?|\s+nov(?:ember)?|\s+dec(?:ember)?|"
+        r"$)"
+    )
+
     # ── Origin ───────────────────────────────────────────────────────────────
+    # Two patterns: "from X to Y" (preferred) and bare "X to Y" (e.g. "JFK
+    # to LHR next Friday"). Try the explicit "from" form first; fall back
+    # to the bare form so users don't have to type "from".
     origin = None
-    from_match = re.search(r"from\s+([a-z\s]{2,20}?)(?:\s+to|\s+on|\s+in|\s+for|$)", text)
+    from_match = re.search(r"from\s+([a-z\s]{2,20}?)" + _LOC_END, text)
     if from_match:
         origin = _resolve_city(from_match.group(1))
+    if not origin:
+        bare_match = re.match(r"\s*([a-z\s]{2,20}?)\s+to\s+", text)
+        if bare_match:
+            origin = _resolve_city(bare_match.group(1))
     if not origin:
         confidence -= 0.3
         origin = "SFO"   # default to user's home airport (from profile in production)
@@ -153,7 +198,7 @@ def _parse_natural_language(query: str) -> tuple[SearchRequest, float, str]:
 
     # ── Destination ───────────────────────────────────────────────────────────
     destination = None
-    to_match = re.search(r"to\s+([a-z\s]{2,20}?)(?:\s+in|\s+on|\s+for|\s+from|$)", text)
+    to_match = re.search(r"to\s+([a-z\s]{2,20}?)" + _LOC_END, text)
     if to_match:
         destination = _resolve_city(to_match.group(1))
     if not destination:

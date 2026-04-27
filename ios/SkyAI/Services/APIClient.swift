@@ -153,16 +153,33 @@ actor APIClient {
         // Backend responses mix two date shapes:
         //   - full ISO8601 datetimes: "2026-06-01T22:30:00Z" (segment.*_at,
         //     search_response.returned_at, offer.last_ticketing_date)
+        //   - ISO8601 LOCAL time, no tz: "2026-05-08T05:25:00"
+        //     (Duffel segment.*_at — departure/arrival in airport local
+        //     time, with no offset). ISO8601DateFormatter rejects these
+        //     so we need a plain DateFormatter with "yyyy-MM-dd'T'HH:mm:ss".
+        //     We treat naïve datetimes as UTC; the UI just renders "HH:mm"
+        //     without tz conversion, which matches what travelers expect
+        //     to see (the local airport clock).
         //   - date-only strings:     "2026-06-01"              (search_request
         //     echoed in responses: departure_date, return_date)
-        // A plain `.iso8601` strategy rejects the date-only shape. This
-        // custom strategy tries full ISO8601 (with and without fractional
-        // seconds) first, then falls back to "yyyy-MM-dd".
+        // The chain tries each format in order, most specific first.
         let iso8601Full = ISO8601DateFormatter()
         iso8601Full.formatOptions = [.withInternetDateTime]
 
         let iso8601Frac = ISO8601DateFormatter()
         iso8601Frac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let localDateTime = DateFormatter()
+        localDateTime.calendar = Calendar(identifier: .iso8601)
+        localDateTime.locale = Locale(identifier: "en_US_POSIX")
+        localDateTime.timeZone = TimeZone(secondsFromGMT: 0)
+        localDateTime.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+
+        let localDateTimeFrac = DateFormatter()
+        localDateTimeFrac.calendar = Calendar(identifier: .iso8601)
+        localDateTimeFrac.locale = Locale(identifier: "en_US_POSIX")
+        localDateTimeFrac.timeZone = TimeZone(secondsFromGMT: 0)
+        localDateTimeFrac.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
 
         let dateOnly = DateFormatter()
         dateOnly.calendar = Calendar(identifier: .iso8601)
@@ -173,9 +190,11 @@ actor APIClient {
         decoder.dateDecodingStrategy = .custom { d in
             let container = try d.singleValueContainer()
             let s = try container.decode(String.self)
-            if let date = iso8601Full.date(from: s) { return date }
-            if let date = iso8601Frac.date(from: s) { return date }
-            if let date = dateOnly.date(from: s) { return date }
+            if let date = iso8601Full.date(from: s)       { return date }
+            if let date = iso8601Frac.date(from: s)       { return date }
+            if let date = localDateTime.date(from: s)     { return date }
+            if let date = localDateTimeFrac.date(from: s) { return date }
+            if let date = dateOnly.date(from: s)          { return date }
             throw DecodingError.dataCorruptedError(
                 in: container,
                 debugDescription: "Unrecognized date format: \(s)"

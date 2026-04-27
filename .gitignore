@@ -1,0 +1,99 @@
+# ── Secrets ──────────────────────────────────────────────────────────────────
+# Never commit env files. Backend reads from backend/.env via python-dotenv.
+.env
+.env.*
+!.env.example
+
+# ── Python / FastAPI backend ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local SQLite DBs
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# ── iOS / Xcode ──────────────────────────────────────────────────────────────
+# User-specific Xcode state — never share these.
+**/xcuserdata/
+**/*.xcworkspace/xcuserdata/
+**/*.xcodeproj/xcuserdata/
+**/*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Build artifacts
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.swiftpm/
+Packages/
+Package.resolved
+
+# CocoaPods (if you ever add it)
+Pods/
+
+# Carthage
+Carthage/Build/
+Carthage/Checkouts/
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# ── Android / Gradle ─────────────────────────────────────────────────────────
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+captures/
+.cxx/
+*.apk
+*.aab
+*.aar
+
+# Keystores — never commit signing keys.
+*.jks
+*.keystore
+
+# ── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# ── Editors ──────────────────────────────────────────────────────────────────
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/

@@ -30,8 +30,8 @@ from models import (
 logger = logging.getLogger(__name__)
 
 DUFFEL_BASE = "https://api.duffel.com"
-DUFFEL_VERSION = "v1"          # Current stable API version
-API_VERSION_HEADER = "v1"      # Duffel-Version header value
+DUFFEL_VERSION = "v2"          # Current stable API version (v1 was retired)
+API_VERSION_HEADER = "v2"      # Duffel-Version header value
 
 CABIN_MAP_TO_DUFFEL = {
     CabinClass.ECONOMY: "economy",
@@ -83,7 +83,21 @@ class DuffelClient:
         offer_request_id = await self._create_offer_request(req)
         raw_offers = await self._fetch_offers(offer_request_id)
 
-        offers = [self._normalize_offer(o) for o in raw_offers]
+        # Normalize offer-by-offer so a single malformed payload doesn't
+        # take down the entire search response. Log and skip on failure.
+        offers: list[FlightOffer] = []
+        skipped = 0
+        for raw in raw_offers:
+            try:
+                offers.append(self._normalize_offer(raw))
+            except Exception as e:        # noqa: BLE001
+                skipped += 1
+                logger.warning(
+                    "Duffel: failed to normalize offer id=%s: %s",
+                    raw.get("id", "?"), e,
+                )
+        if skipped:
+            logger.warning(f"Duffel: skipped {skipped} unparseable offers (kept {len(offers)})")
         offers.sort(key=lambda o: o.price.total_usd)
         return offers
 
@@ -179,22 +193,17 @@ class DuffelClient:
         """Convert Duffel offer dict → SkyAI FlightOffer schema."""
 
         # Itineraries (Duffel calls them "slices")
-        itineraries = [self._parse_slice(s) for s in raw.get("slices", [])]
+        itineraries = [self._parse_slice(s) for s in (raw.get("slices") or [])]
 
         # Price — Duffel returns total_amount + total_currency
         total = float(raw.get("total_amount", 0))
         base = float(raw.get("base_amount", total * 0.82))
         taxes = round(total - base, 2)
 
-        # Per-passenger price
-        passengers = raw.get("passengers", [])
+        # Per-passenger price — divide total by number of adults.
+        passengers = raw.get("passengers") or []
         per_adult = None
         if passengers:
-            adult_prices = [
-                float(p.get("fare_basis_code", {}).get("amount", 0) or 0)
-                for p in passengers if p.get("type") == "adult"
-            ]
-            # Simpler: divide total by number of adults
             adult_count = sum(1 for p in passengers if p.get("type") == "adult")
             if adult_count:
                 per_adult = round(total / adult_count, 2)
@@ -236,24 +245,27 @@ class DuffelClient:
         """Convert a Duffel slice (one direction) → SkyAI Itinerary."""
         segments: list[Segment] = []
 
-        for seg in raw_slice.get("segments", []):
-            origin = seg.get("origin", {}).get("iata_code", "")
-            destination = seg.get("destination", {}).get("iata_code", "")
+        for seg in raw_slice.get("segments") or []:
+            # Every nested object below can be null in Duffel v2 — coerce
+            # with `or {}` rather than relying on .get(key, {}), which only
+            # defaults missing keys, not explicit nulls.
+            origin = (seg.get("origin") or {}).get("iata_code", "")
+            destination = (seg.get("destination") or {}).get("iata_code", "")
 
-            dep_str = seg.get("departing_at", "")
-            arr_str = seg.get("arriving_at", "")
+            dep_str = seg.get("departing_at") or ""
+            arr_str = seg.get("arriving_at") or ""
 
             dep_dt = datetime.fromisoformat(dep_str) if dep_str else datetime.now(timezone.utc)
             arr_dt = datetime.fromisoformat(arr_str) if arr_str else datetime.now(timezone.utc)
             duration_min = int((arr_dt - dep_dt).total_seconds() / 60)
 
-            carrier = seg.get("marketing_carrier", {}).get("iata_code", "")
-            flight_num = str(seg.get("marketing_carrier_flight_number", ""))
-            aircraft_raw = seg.get("aircraft", {})
+            carrier = (seg.get("marketing_carrier") or {}).get("iata_code", "")
+            flight_num = str(seg.get("marketing_carrier_flight_number") or "")
+            aircraft_raw = seg.get("aircraft") or {}
             aircraft = aircraft_raw.get("name") if aircraft_raw else None
 
             # Cabin — Duffel puts it at the passenger level; use slice-level cabin as fallback
-            cabin_raw = raw_slice.get("fare_brand_name", "").lower()
+            cabin_raw = (raw_slice.get("fare_brand_name") or "").lower()
             cabin = CabinClass.ECONOMY  # default
             for duffel_cabin, skyai_cabin in CABIN_MAP_FROM_DUFFEL.items():
                 if duffel_cabin in cabin_raw:
@@ -296,9 +308,9 @@ class DuffelClient:
         Duffel surfaces baggage in conditions_at_ticketing.baggages per passenger.
         We use the first adult passenger's allowance.
         """
-        for passenger in raw.get("passengers", []):
+        for passenger in raw.get("passengers") or []:
             if passenger.get("type") == "adult":
-                baggages = passenger.get("baggages", [])
+                baggages = passenger.get("baggages") or []
                 checked = sum(
                     b.get("quantity", 0)
                     for b in baggages if b.get("type") == "checked"
@@ -314,9 +326,12 @@ class DuffelClient:
         """
         Duffel exposes conditions in conditions_at_ticketing (refund/change).
         """
-        conditions = raw.get("conditions", {})
-        refund = conditions.get("refund_before_departure", {})
-        change = conditions.get("change_before_departure", {})
+        # Duffel returns these keys with null values when conditions are
+        # unknown/unavailable, so .get(key, {}) isn't enough — we need the
+        # `or {}` to coerce explicit nulls to an empty dict.
+        conditions = raw.get("conditions") or {}
+        refund = conditions.get("refund_before_departure") or {}
+        change = conditions.get("change_before_departure") or {}
 
         is_refundable = refund.get("allowed", False)
         change_allowed = change.get("allowed", False)

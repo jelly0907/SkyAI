@@ -1,6 +1,6 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
-httpx==0.27.2
+httpx[http2]==0.27.2   # http2 extra pulls in `h2`; required by Duffel/Amadeus clients
 pydantic==2.9.2
 pydantic-settings==2.5.2
 python-dotenv==1.0.1

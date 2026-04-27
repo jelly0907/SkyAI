@@ -41,8 +41,12 @@ struct FlightDetailView: View {
                         SectionHeaderView(title: "Route")
 
                         VStack(spacing: 16) {
-                            DetailedSegmentView(
-                                segment: offer.outbound.segments.first,
+                            // Show every segment of the outbound itinerary,
+                            // with layover gaps surfaced between them. Was
+                            // previously passing only segments.first which
+                            // dropped all but the first leg of multi-stop trips.
+                            ItineraryBreakdownView(
+                                itinerary: offer.outbound,
                                 title: "Outbound",
                                 subtitle: formatDate(offer.outbound.segments.first?.departureTime ?? Date())
                             )
@@ -51,8 +55,8 @@ struct FlightDetailView: View {
                                 Divider()
                                     .padding(.vertical, 8)
 
-                                DetailedSegmentView(
-                                    segment: inbound.segments.first,
+                                ItineraryBreakdownView(
+                                    itinerary: inbound,
                                     title: "Return",
                                     subtitle: formatDate(inbound.segments.first?.departureTime ?? Date())
                                 )
@@ -304,67 +308,165 @@ struct FlightDetailView: View {
     }
 }
 
-struct DetailedSegmentView: View {
-    let segment: Segment?
+/// Renders every segment of an itinerary with layover gaps surfaced
+/// between consecutive legs. Replaces the old DetailedSegmentView, which
+/// only displayed the first segment.
+struct ItineraryBreakdownView: View {
+    let itinerary: Itinerary
     let title: String
     let subtitle: String
 
     var body: some View {
-        if let segment = segment {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(title)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.secondary)
 
-                    Spacer()
+                Spacer()
 
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                }
+                Text(subtitle)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
 
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(segment.departureAirport)
-                            .font(.system(size: 14, weight: .semibold))
+            // Each segment as its own row, with a "layover" indicator
+            // injected between consecutive segments showing the airport
+            // and wait duration.
+            ForEach(Array(itinerary.segments.enumerated()), id: \.offset) { idx, segment in
+                SegmentRowView(segment: segment, legNumber: idx + 1)
 
-                        Text(formatTime(segment.departureTime))
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
-                    }
-
-                    VStack(alignment: .center, spacing: 0) {
-                        Text("\(segment.durationMinutes / 60)h \(segment.durationMinutes % 60)m")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.secondary)
-
-                        Divider()
-
-                        Text("\(segment.stops) stop\(segment.stops == 1 ? "" : "s")")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(segment.arrivalAirport)
-                            .font(.system(size: 14, weight: .semibold))
-
-                        Text(formatTime(segment.arrivalTime))
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
-                    }
-
-                    Spacer()
+                // Layover row between this segment and the next.
+                if idx < itinerary.segments.count - 1 {
+                    let next = itinerary.segments[idx + 1]
+                    LayoverRowView(
+                        airport: segment.arrivalAirport,
+                        layoverMinutes: layoverMinutes(arrival: segment.arrivalTime, nextDeparture: next.departureTime)
+                    )
                 }
             }
         }
+    }
+
+    private func layoverMinutes(arrival: Date, nextDeparture: Date) -> Int {
+        max(0, Int(nextDeparture.timeIntervalSince(arrival) / 60))
+    }
+}
+
+/// One leg of a multi-stop trip — origin → destination, times, flight #.
+struct SegmentRowView: View {
+    let segment: Segment
+    let legNumber: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Leg \(legNumber)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Color(red: 0.1, green: 0.235, blue: 0.42))
+
+                Spacer()
+
+                Text("\(segment.airlineCode) \(segment.flightNumber)")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(segment.departureAirport)
+                        .font(.system(size: 14, weight: .semibold))
+
+                    Text(formatTime(segment.departureTime))
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+
+                VStack(alignment: .center, spacing: 0) {
+                    Text("\(segment.durationMinutes / 60)h \(segment.durationMinutes % 60)m")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(segment.arrivalAirport)
+                        .font(.system(size: 14, weight: .semibold))
+
+                    HStack(spacing: 2) {
+                        Text(formatTime(segment.arrivalTime))
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+
+                        if isNextDay(departure: segment.departureTime, arrival: segment.arrivalTime) {
+                            Text("+1")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Color(uiColor: .systemGray6).opacity(0.5))
+        .cornerRadius(8)
     }
 
     private func formatTime(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
+    }
+
+    private func isNextDay(departure: Date, arrival: Date) -> Bool {
+        Calendar.current.dateComponents([.day], from: departure, to: arrival).day ?? 0 > 0
+    }
+}
+
+/// Compact row shown between consecutive segments — airport name and
+/// layover duration so the user knows how long they're stuck on the ground.
+struct LayoverRowView: View {
+    let airport: String
+    let layoverMinutes: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "clock")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            Text("Layover at \(airport)")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Text(formattedLayover)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(layoverColor)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    private var formattedLayover: String {
+        let h = layoverMinutes / 60
+        let m = layoverMinutes % 60
+        if h == 0 { return "\(m)m" }
+        if m == 0 { return "\(h)h" }
+        return "\(h)h \(m)m"
+    }
+
+    /// Tight layover (<60min) is risky — flag in red. >5h is bad UX, flag
+    /// in orange. Otherwise neutral gray.
+    private var layoverColor: Color {
+        if layoverMinutes < 60 { return .red }
+        if layoverMinutes > 300 { return .orange }
+        return .secondary
     }
 }
 
