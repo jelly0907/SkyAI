@@ -14,7 +14,7 @@ import uuid
 from datetime import date, datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
 
 from db.database import AsyncSessionLocal
 from db.models_sql import PriceObservation
@@ -351,13 +351,24 @@ async def _log_observations(
 
 
 @router.post("/flights", response_model=SearchResponse, summary="Search for flights")
-async def search_flights(body: SearchRequest, request: Request) -> SearchResponse:
+async def search_flights(
+    body: SearchRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+) -> SearchResponse:
     """
     Executes a flight search against the configured provider (mock / Duffel / Amadeus).
     Returns offers enriched with Price Intelligence and logs each price point
     to the price history database for future ML training.
     """
     provider = getattr(request.app.state, "provider", "mock")
+    req_id = uuid.uuid4().hex[:8]
+    t0 = datetime.now(timezone.utc)
+    logger.info(
+        "[search %s] start: %s→%s %s adults=%d cabin=%s provider=%s",
+        req_id, body.origin, body.destination, body.departure_date,
+        body.adults, body.cabin_class.value, provider,
+    )
 
     try:
         if provider == "mock":
@@ -367,20 +378,30 @@ async def search_flights(body: SearchRequest, request: Request) -> SearchRespons
             client = request.app.state.flight_client
             offers = await client.search_flights(body)
     except Exception as e:
-        logger.exception(f"Flight search failed ({provider}): {e}")
+        logger.exception(f"[search {req_id}] provider call failed ({provider}): {e}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Flight search failed: {str(e)}",
         )
+    t_provider = (datetime.now(timezone.utc) - t0).total_seconds()
+    logger.info("[search %s] provider returned %d offers in %.2fs",
+                req_id, len(offers), t_provider)
 
-    # Run offers through the Price Intelligence engine (idempotent — overrides
-    # any pre-existing intelligence with the current engine's classification).
+    # Run offers through the Price Intelligence engine. Mock-only by default
+    # (see price_intel/provider.py); DB provider is opt-in via PRICE_INTEL_USE_DB.
     engine = get_price_intel_engine()
-    offers = engine.enrich_offers(offers, body.departure_date)
+    t_pi_start = datetime.now(timezone.utc)
+    offers = await engine.enrich_offers(offers, body.departure_date)
+    t_pi = (datetime.now(timezone.utc) - t_pi_start).total_seconds()
+    logger.info("[search %s] price-intel enriched in %.2fs", req_id, t_pi)
 
-    # Log every offer as a price observation (fire-and-forget; never fails the
-    # response).
-    await _log_observations(offers, body, provider)
+    # Log every offer as a price observation. Scheduled as a background task
+    # so the user-facing response returns immediately.
+    background_tasks.add_task(_log_observations, offers, body, provider)
+
+    total = (datetime.now(timezone.utc) - t0).total_seconds()
+    logger.info("[search %s] done in %.2fs (provider=%.2fs intel=%.2fs)",
+                req_id, total, t_provider, t_pi)
 
     return SearchResponse(
         query_id=str(uuid.uuid4()),

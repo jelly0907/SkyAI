@@ -2,6 +2,9 @@
 High-level entry point for the price intelligence engine.
 
 Callers should only need this class. Internals (providers, rules) stay pluggable.
+
+All public methods are async because the underlying RouteStatsProvider may
+hit the database. Callers in routes/*.py must `await` them.
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ class PriceIntelEngine:
     def __init__(self, stats_provider: RouteStatsProvider):
         self._stats_provider = stats_provider
 
-    def classify_offer(self, offer: FlightOffer, departure_date: date) -> PriceIntelligence:
+    async def classify_offer(self, offer: FlightOffer, departure_date: date) -> PriceIntelligence:
         """Classify a single FlightOffer."""
         if not offer.itineraries:
             return _unknown("Offer has no itineraries.")
@@ -41,7 +44,7 @@ class PriceIntelEngine:
         destination = offer.itineraries[0].segments[-1].destination
         cabin = first_seg.cabin.value
 
-        stats = self._stats_provider.get(origin, destination, cabin)
+        stats = await self._stats_provider.get(origin, destination, cabin)
         if stats is None:
             return _unknown(
                 f"Not enough price history yet for {origin} → {destination} ({cabin}). "
@@ -51,7 +54,7 @@ class PriceIntelEngine:
         days_out = max((departure_date - date.today()).days, 0)
         return rules.classify(offer.price.total_usd, stats, days_out)
 
-    def classify_price(
+    async def classify_price(
         self,
         price_usd: float,
         origin: str,
@@ -60,7 +63,7 @@ class PriceIntelEngine:
         departure_date: date,
     ) -> PriceIntelligence:
         """Classify a raw (price, route) — useful for the watch-check loop."""
-        stats = self._stats_provider.get(origin, destination, cabin_class)
+        stats = await self._stats_provider.get(origin, destination, cabin_class)
         if stats is None:
             return _unknown(
                 f"Not enough price history yet for {origin} → {destination} ({cabin_class})."
@@ -68,23 +71,27 @@ class PriceIntelEngine:
         days_out = max((departure_date - date.today()).days, 0)
         return rules.classify(price_usd, stats, days_out)
 
-    def enrich_offers(
+    async def enrich_offers(
         self,
         offers: list[FlightOffer],
         departure_date: date,
     ) -> list[FlightOffer]:
-        """Return a new list where each offer has its price_intelligence populated."""
+        """Return a new list where each offer has its price_intelligence populated.
+
+        The provider's per-route cache means this only hits the DB once per
+        unique (origin, destination, cabin) triple, even with 50+ offers.
+        """
         out: list[FlightOffer] = []
         for o in offers:
-            pi = self.classify_offer(o, departure_date)
+            pi = await self.classify_offer(o, departure_date)
             out.append(o.model_copy(update={"price_intelligence": pi}))
         return out
 
-    def get_route_stats(
+    async def get_route_stats(
         self, origin: str, destination: str, cabin_class: str
     ) -> Optional[RouteStats]:
         """Expose raw stats (useful for debugging and /watch/{id}/check responses)."""
-        return self._stats_provider.get(origin, destination, cabin_class)
+        return await self._stats_provider.get(origin, destination, cabin_class)
 
 
 def _unknown(reason: str) -> PriceIntelligence:

@@ -122,20 +122,68 @@ private enum BackendError {
     }
 }
 
+// MARK: - Dev backend host
+//
+// On a physical iPhone, "localhost" resolves to the phone itself, so we
+// have to reach the Mac by name or IP. We resolve via Bonjour/mDNS
+// (<hostname>.local) so the URL keeps working when DHCP reshuffles the
+// Mac's IP — no more editing this file every time the network blips.
+//
+// To find your Mac's mDNS name, run this in Terminal on the Mac:
+//
+//     scutil --get LocalHostName
+//
+// Then set MAC_HOSTNAME below to that exact value (without ".local" — we
+// append it). For example, if `scutil` prints "Jerrys-MacBook-Pro", set
+// `MAC_HOSTNAME = "Jerrys-MacBook-Pro"`.
+//
+// Caveats:
+//   • mDNS only works on the LAN. Cellular / hotspot won't resolve .local.
+//   • The Simulator already shares the Mac's networking, so we just hit
+//     127.0.0.1 there — no Bonjour roundtrip needed.
+//   • If .local resolution ever fails on-device, fall back to your Mac's
+//     IP literal (`ipconfig getifaddr en0`) by editing `deviceBaseURL`.
+//
+// Info.plist requirements (already in place since plain-HTTP IP requests
+// are working today): App Transport Security must allow HTTP to the local
+// network — typically `NSAppTransportSecurity → NSAllowsLocalNetworking`
+// or `NSAllowsArbitraryLoads`. The local-network privacy prompt is also
+// already granted because the previous IP-based config triggered it.
+
+private let MAC_HOSTNAME = "Jerrys-MacBook-Pro"   // ← TODO: paste output of `scutil --get LocalHostName`
+private let DEV_BACKEND_PORT = 8000
+
+private func defaultDevBaseURL() -> URL {
+    #if targetEnvironment(simulator)
+    return URL(string: "http://127.0.0.1:\(DEV_BACKEND_PORT)")!
+    #else
+    return URL(string: "http://\(MAC_HOSTNAME).local:\(DEV_BACKEND_PORT)")!
+    #endif
+}
+
 actor APIClient {
     static let shared = APIClient()
 
     private let baseURL: URL
     private let session: URLSession
 
-    // Dev backend on the Mac's LAN IP. When running on a physical iPhone,
-    // "localhost" resolves to the phone itself — point at the Mac instead.
-    // Swap back to http://localhost:8000 when running in the Simulator.
-    private init(baseURL: URL = URL(string: "http://192.168.86.144:8000")!) {
+    private init(baseURL: URL = defaultDevBaseURL()) {
         self.baseURL = baseURL
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
+        // Use .ephemeral so nothing is cached on disk, and force the server
+        // to close the TCP connection after each response. Reason: with
+        // `uvicorn --reload`, every code edit restarts the server and severs
+        // any iOS-held keep-alive socket without iOS noticing. The next
+        // request reuses the dead socket and times out at ~30s. Disabling
+        // keep-alive (Connection: close) makes every search a fresh TCP
+        // handshake — slightly more bytes on the wire, vastly more reliable
+        // during dev. Drop this header in production once the backend is
+        // stable behind a real reverse proxy.
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        config.httpShouldUsePipelining = false
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.httpAdditionalHeaders = ["Connection": "close"]
         self.session = URLSession(configuration: config)
     }
 
@@ -237,7 +285,21 @@ actor APIClient {
         }
 
         do {
-            let (data, response) = try await session.data(for: request)
+            // Single retry for transient TCP-level failures. Stale-socket
+            // symptoms (.networkConnectionLost, .timedOut on a "warm"
+            // connection) recover instantly on a fresh handshake; this
+            // keeps that recovery invisible to the user instead of
+            // bubbling up as a generic timeout.
+            let (data, response): (Data, URLResponse)
+            do {
+                (data, response) = try await session.data(for: request)
+            } catch let urlErr as URLError where
+                urlErr.code == .networkConnectionLost ||
+                urlErr.code == .timedOut ||
+                urlErr.code == .cannotConnectToHost {
+                print("⚠️ Network error \(urlErr.code.rawValue) on \(method) \(endpoint) — retrying once")
+                (data, response) = try await session.data(for: request)
+            }
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw SkyAIError.unknown

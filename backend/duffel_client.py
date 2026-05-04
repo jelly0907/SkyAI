@@ -80,8 +80,12 @@ class DuffelClient:
         """
         assert self._http is not None, "Call start() before searching."
 
+        logger.info("Duffel: search_flights() called for %s→%s %s",
+                    req.origin, req.destination, req.departure_date)
         offer_request_id = await self._create_offer_request(req)
+        logger.info("Duffel: offer_request created, fetching offers")
         raw_offers = await self._fetch_offers(offer_request_id)
+        logger.info("Duffel: %d raw offers received, normalizing", len(raw_offers))
 
         # Normalize offer-by-offer so a single malformed payload doesn't
         # take down the entire search response. Log and skip on failure.

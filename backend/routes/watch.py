@@ -239,7 +239,7 @@ async def check_watch(
     best = min(offers, key=lambda o: o.price.total_usd)
 
     engine = get_price_intel_engine()
-    pi = engine.classify_price(
+    pi = await engine.classify_price(
         price_usd=best.price.total_usd,
         origin=watch.origin,
         destination=watch.destination,
