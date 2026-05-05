@@ -150,7 +150,7 @@ private enum BackendError {
 // or `NSAllowsArbitraryLoads`. The local-network privacy prompt is also
 // already granted because the previous IP-based config triggered it.
 
-private let MAC_HOSTNAME = "Jerrys-MacBook-Pro"   // ← TODO: paste output of `scutil --get LocalHostName`
+private let MAC_HOSTNAME = "Stones-MacBook-Air"   // output of `scutil --get LocalHostName`
 private let DEV_BACKEND_PORT = 8000
 
 private func defaultDevBaseURL() -> URL {

@@ -17,6 +17,35 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object RetrofitClient {
 
+    // ── Dev backend host ─────────────────────────────────────────────────
+    //
+    // Pick whichever line matches where you're running the app:
+    //
+    //   • Physical Android device on the same Wi-Fi as your Mac:
+    //         "http://<your-mac>.local:8000/"
+    //     where <your-mac> is the output of `scutil --get LocalHostName`
+    //     on the Mac. mDNS resolves this to the Mac's current LAN IP
+    //     automatically, so DHCP changes don't break it.
+    //
+    //   • Android Studio emulator:
+    //         "http://10.0.2.2:8000/"
+    //     10.0.2.2 is the emulator's special alias for the host machine's
+    //     loopback. Doesn't work from a real device on Wi-Fi.
+    //
+    //   • Last-resort fallback (LAN IP literal):
+    //         "http://192.168.x.y:8000/"
+    //     `ipconfig getifaddr en0` on the Mac gives you the value. Works
+    //     anywhere `.local` doesn't resolve, but you'll have to update it
+    //     whenever DHCP rolls.
+    //
+    // Cleartext HTTP requires `android:usesCleartextTraffic="true"` on the
+    // <application> tag in AndroidManifest.xml — already set.
+    //
+    // TODO before first device build: paste the output of
+    //     scutil --get LocalHostName
+    // (run on your Mac) into the BASE_URL host below.
+    // Emulator: 10.0.2.2 is the AVD's alias for the host Mac's 127.0.0.1.
+    // Physical device on Wi-Fi: swap to "http://Stones-MacBook-Air.local:8000/".
     private const val BASE_URL = "http://10.0.2.2:8000/"
 
     @Singleton

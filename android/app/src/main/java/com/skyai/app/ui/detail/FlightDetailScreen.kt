@@ -216,6 +216,8 @@ fun FlightDetailScreen(
                                         PriceLabel.STEAL -> Color(0xFFEF5350)
                                         PriceLabel.GREAT_DEAL -> Color(0xFF66BB6A)
                                         PriceLabel.FAIR -> Color(0xFF90A4AE)
+                                        PriceLabel.EXPENSIVE -> Color(0xFFF59E0B)
+                                        PriceLabel.OVERPRICED -> Color(0xFFEF4444)
                                         PriceLabel.UNKNOWN -> Color.Transparent
                                     },
                                     shape = MaterialTheme.shapes.small
@@ -225,6 +227,8 @@ fun FlightDetailScreen(
                                             PriceLabel.STEAL -> "STEAL"
                                             PriceLabel.GREAT_DEAL -> "GREAT DEAL"
                                             PriceLabel.FAIR -> "FAIR"
+                                            PriceLabel.EXPENSIVE -> "ABOVE AVG"
+                                            PriceLabel.OVERPRICED -> "OVERPRICED"
                                             PriceLabel.UNKNOWN -> ""
                                         },
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -267,15 +271,19 @@ fun FlightDetailScreen(
                         ) {
                             Icon(
                                 imageVector = when (offer.priceIntelligence.trend) {
-                                    PriceTrend.UP -> Icons.Default.TrendingUp
-                                    PriceTrend.DOWN -> Icons.Default.TrendingDown
+                                    PriceTrend.RISING -> Icons.Default.TrendingUp
+                                    PriceTrend.FALLING -> Icons.Default.TrendingDown
                                     PriceTrend.STABLE -> Icons.Default.RestartAlt
+                                    // VOLATILE means "no clear direction" — reuse the
+                                    // stable icon; copy below differentiates the wording.
+                                    PriceTrend.VOLATILE -> Icons.Default.RestartAlt
                                 },
                                 contentDescription = null,
                                 tint = when (offer.priceIntelligence.trend) {
-                                    PriceTrend.UP -> Color(0xFFEF5350)
-                                    PriceTrend.DOWN -> Color(0xFF66BB6A)
+                                    PriceTrend.RISING -> Color(0xFFEF5350)
+                                    PriceTrend.FALLING -> Color(0xFF66BB6A)
                                     PriceTrend.STABLE -> Color(0xFF90A4AE)
+                                    PriceTrend.VOLATILE -> Color(0xFFF59E0B)
                                 },
                                 modifier = Modifier
                                     .width(20.dp)
@@ -283,9 +291,10 @@ fun FlightDetailScreen(
                             )
                             Text(
                                 text = when (offer.priceIntelligence.trend) {
-                                    PriceTrend.UP -> "Price Rising"
-                                    PriceTrend.DOWN -> "Price Falling"
+                                    PriceTrend.RISING -> "Price Rising"
+                                    PriceTrend.FALLING -> "Price Falling"
                                     PriceTrend.STABLE -> "Price Stable"
+                                    PriceTrend.VOLATILE -> "Price Volatile"
                                 },
                                 style = MaterialTheme.typography.labelSmall
                             )

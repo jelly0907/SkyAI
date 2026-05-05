@@ -79,7 +79,7 @@ fun WatchlistScreen(navController: NavController) {
             alertThreshold = 800.0,
             predictedLow = 788.0,
             priceAtCreation = 1020.0,
-            trend = PriceTrend.UP,
+            trend = PriceTrend.RISING,
             status = WatchStatus.ACTIVE,
             airline = "NH"
         ),
@@ -93,7 +93,7 @@ fun WatchlistScreen(navController: NavController) {
             alertThreshold = 950.0,
             predictedLow = 910.0,
             priceAtCreation = 1200.0,
-            trend = PriceTrend.DOWN,
+            trend = PriceTrend.FALLING,
             status = WatchStatus.ACTIVE,
             airline = "BA"
         )
@@ -278,17 +278,17 @@ private fun WatchCard(watch: PriceWatch) {
                         // Trend badge
                         Surface(
                             modifier = Modifier.background(
-                                color = if (watch.trend == PriceTrend.DOWN) GreenSuccess.copy(alpha = 0.15f)
+                                color = if (watch.trend == PriceTrend.FALLING) GreenSuccess.copy(alpha = 0.15f)
                                 else RedError.copy(alpha = 0.15f),
                                 shape = RoundedCornerShape(6.dp)
                             ),
-                            color = if (watch.trend == PriceTrend.DOWN) GreenSuccess.copy(alpha = 0.15f)
+                            color = if (watch.trend == PriceTrend.FALLING) GreenSuccess.copy(alpha = 0.15f)
                             else RedError.copy(alpha = 0.15f)
                         ) {
                             Text(
-                                text = if (watch.trend == PriceTrend.DOWN) "↓ FALLING" else "↑ RISING",
+                                text = if (watch.trend == PriceTrend.FALLING) "↓ FALLING" else "↑ RISING",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = if (watch.trend == PriceTrend.DOWN) GreenSuccess else RedError,
+                                    color = if (watch.trend == PriceTrend.FALLING) GreenSuccess else RedError,
                                     fontWeight = FontWeight.Bold
                                 ),
                                 modifier = Modifier.padding(4.dp)
@@ -324,7 +324,7 @@ private fun WatchCard(watch: PriceWatch) {
             }
 
             // Trend info box (shown when FALLING)
-            if (watch.trend == PriceTrend.DOWN) {
+            if (watch.trend == PriceTrend.FALLING) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Surface(
                     modifier = Modifier

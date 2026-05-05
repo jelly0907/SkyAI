@@ -44,17 +44,20 @@ class SearchViewModel @Inject constructor(
             val result = repository.parseIntent(query)
             result.onSuccess { response ->
                 _formState.update { currentState ->
+                    // The IntentResponse field is `searchRequest` (backend `search_request`).
+                    // SearchRequest's wire field is `non_stop_only`; the UI keeps the
+                    // user-facing label "directOnly" so we map between them at the boundary.
                     currentState.copy(
-                        origin = response.parsedRequest.origin,
-                        destination = response.parsedRequest.destination,
-                        departureDate = response.parsedRequest.departureDate,
-                        returnDate = response.parsedRequest.returnDate ?: "",
-                        adults = response.parsedRequest.adults,
-                        children = response.parsedRequest.children,
-                        infants = response.parsedRequest.infants,
-                        cabinClass = response.parsedRequest.cabinClass,
-                        directOnly = response.parsedRequest.directOnly,
-                        tripType = response.parsedRequest.tripType
+                        origin = response.searchRequest.origin,
+                        destination = response.searchRequest.destination,
+                        departureDate = response.searchRequest.departureDate,
+                        returnDate = response.searchRequest.returnDate ?: "",
+                        adults = response.searchRequest.adults,
+                        children = response.searchRequest.children,
+                        infants = response.searchRequest.infants,
+                        cabinClass = response.searchRequest.cabinClass,
+                        directOnly = response.searchRequest.nonStopOnly,
+                        tripType = response.searchRequest.tripType
                     )
                 }
                 _intentParseState.update { IntentParseState.Success(response) }
@@ -81,8 +84,8 @@ class SearchViewModel @Inject constructor(
             children = state.children,
             infants = state.infants,
             cabinClass = state.cabinClass,
-            directOnly = state.directOnly,
-            tripType = state.tripType
+            tripType = state.tripType,
+            nonStopOnly = state.directOnly,
         )
 
         viewModelScope.launch {

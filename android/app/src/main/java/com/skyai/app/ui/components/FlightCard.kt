@@ -51,6 +51,8 @@ fun FlightCard(
         PriceLabel.STEAL -> Color(0xFFEF5350)
         PriceLabel.GREAT_DEAL -> Color(0xFF66BB6A)
         PriceLabel.FAIR -> Color(0xFF90A4AE)
+        PriceLabel.EXPENSIVE -> Color(0xFFF59E0B)
+        PriceLabel.OVERPRICED -> Color(0xFFEF4444)
         PriceLabel.UNKNOWN -> null
     }
 
@@ -58,6 +60,8 @@ fun FlightCard(
         PriceLabel.STEAL -> "STEAL"
         PriceLabel.GREAT_DEAL -> "GREAT DEAL"
         PriceLabel.FAIR -> "FAIR"
+        PriceLabel.EXPENSIVE -> "ABOVE AVG"
+        PriceLabel.OVERPRICED -> "OVERPRICED"
         PriceLabel.UNKNOWN -> null
     }
 
@@ -247,6 +251,7 @@ fun FlightCard(
                     ActionType.BUY_NOW -> MaterialTheme.colorScheme.primary
                     ActionType.WAIT -> MaterialTheme.colorScheme.secondary
                     ActionType.SET_ALERT -> Color(0xFFFF6B35)
+                    ActionType.MONITOR -> MaterialTheme.colorScheme.outline
                 }
 
                 when (offer.priceIntelligence.actionType) {
@@ -274,6 +279,18 @@ fun FlightCard(
                             modifier = Modifier.width(100.dp)
                         ) {
                             Text("Set Alert 🔔", fontSize = 12.sp)
+                        }
+                    }
+
+                    // MONITOR is the engine's "neutral" recommendation —
+                    // price is in line with history. Show the same button
+                    // shape as the other passive actions.
+                    ActionType.MONITOR -> {
+                        OutlinedButton(
+                            onClick = { onSelectFlight() },
+                            modifier = Modifier.width(100.dp)
+                        ) {
+                            Text("Monitor 👀", fontSize = 12.sp)
                         }
                     }
                 }
