@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive launcher-icon background. Solid SkyAI brand blue (#1A3C6B,
+  matches the design system used in iOS Theme.Color.primary).
+  Vector path fills the entire 108dp × 108dp adaptive-icon canvas.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#1A3C6B"
+        android:pathData="M0,0 H108 V108 H0 Z" />
+</vector>
