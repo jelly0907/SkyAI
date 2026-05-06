@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -451,16 +454,20 @@ private fun CabinClassDropdown(
     }
 }
 
-private fun Modifier.clickableNoRipple(onClick: () -> Unit) =
-    this.then(
-        Modifier.then(
-            androidx.compose.foundation.clickable(
-                indication = null,
-                interactionSource = androidx.compose.foundation.interaction.MutableInteractionSource(),
-                onClick = onClick
-            )
+// Helper used by tap-able areas that should NOT show a ripple. `clickable`
+// is a Modifier extension (in androidx.compose.foundation), so it needs a
+// Modifier receiver — calling it as a free function fails to resolve.
+// `composed { ... }` (also a Modifier extension) defers construction into a
+// composable scope so `remember { MutableInteractionSource() }` can run.
+private fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
+    composed {
+        val interactionSource = remember { MutableInteractionSource() }
+        this.clickable(
+            indication = null,
+            interactionSource = interactionSource,
+            onClick = onClick
         )
-    )
+    }
 
 @Preview(showBackground = true)
 @Composable

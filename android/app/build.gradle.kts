@@ -34,7 +34,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions { jvmTarget = "17" }
+    kotlinOptions {
+        jvmTarget = "17"
+        // Opt in once for the project so we don't have to annotate every
+        // composable that touches Scaffold, TopAppBar, ExposedDropdownMenuBox,
+        // pull-to-refresh, etc. — they're all marked @ExperimentalMaterial3Api
+        // even though they're the standard way to build a Compose UI today.
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+        )
+    }
 
     buildFeatures { compose = true }
 

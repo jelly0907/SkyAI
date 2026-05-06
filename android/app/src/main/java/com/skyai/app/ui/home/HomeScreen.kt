@@ -27,8 +27,13 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+// `FilledButton` doesn't exist in Material 3 — the standard `Button`
+// composable IS the filled style. `filledButtonColors` → `buttonColors`.
+// (M3's other variants are their own composables: FilledTonalButton,
+// ElevatedButton, OutlinedButton, TextButton.)
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -409,10 +414,10 @@ private fun DealCardItem(deal: DealCard) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            FilledButton(
+            Button(
                 onClick = {},
                 modifier = Modifier.fillMaxWidth(),
-                colors = androidx.compose.material3.ButtonDefaults.filledButtonColors(
+                colors = ButtonDefaults.buttonColors(
                     containerColor = GreenSuccess
                 )
             ) {

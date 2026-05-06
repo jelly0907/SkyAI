@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.LocalOffer
@@ -65,8 +66,7 @@ fun ParetoBar(
                         Icon(
                             imageVector = Icons.Default.LocalOffer,
                             contentDescription = "Cheapest",
-                            modifier = Modifier
-                                .android.compose.ui.unit.sp(16)
+                            modifier = Modifier.size(16.dp)
                         )
                     },
                     modifier = Modifier.weight(1f)
@@ -87,8 +87,7 @@ fun ParetoBar(
                         Icon(
                             imageVector = Icons.Default.AccessTime,
                             contentDescription = "Fastest",
-                            modifier = Modifier
-                                .android.compose.ui.unit.sp(16)
+                            modifier = Modifier.size(16.dp)
                         )
                     },
                     modifier = Modifier.weight(1f)
@@ -109,8 +108,7 @@ fun ParetoBar(
                         Icon(
                             imageVector = Icons.Default.TrendingDown,
                             contentDescription = "Best Deal",
-                            modifier = Modifier
-                                .android.compose.ui.unit.sp(16)
+                            modifier = Modifier.size(16.dp)
                         )
                     },
                     modifier = Modifier.weight(1f)

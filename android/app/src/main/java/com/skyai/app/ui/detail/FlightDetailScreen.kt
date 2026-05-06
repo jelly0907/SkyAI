@@ -16,8 +16,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AirlineSeatReclineExtra
 import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.BackpackRounded
-import androidx.compose.material.icons.filled.BellOutlined
+// `BackpackRounded` and `BellOutlined` don't exist as Material Icon names.
+// `Icons.Default.Luggage` and `Icons.Default.NotificationsNone` are the
+// closest matches and are part of `material-icons-extended` which the
+// build already pulls in.
+import androidx.compose.material.icons.filled.Luggage
+import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
@@ -148,8 +152,12 @@ fun FlightDetailScreen(
                     }
                 }
 
-                // Return Flight (if roundtrip)
-                if (offer.returnItinerary != null) {
+                // Return Flight (if roundtrip).
+                // `returnItinerary` is a Kotlin custom getter (computed off
+                // `itineraries[1]`), so the compiler can't smart-cast away
+                // the null check across calls. Bind to a local first.
+                val returnItinerary = offer.returnItinerary
+                if (returnItinerary != null) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -165,9 +173,9 @@ fun FlightDetailScreen(
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
-                            offer.returnItinerary.segments.forEachIndexed { index, segment ->
+                            returnItinerary.segments.forEachIndexed { index, segment ->
                                 SegmentRow(segment = segment)
-                                if (index < offer.returnItinerary.segments.size - 1) {
+                                if (index < returnItinerary.segments.size - 1) {
                                     Text(
                                         text = "Connection Time",
                                         style = MaterialTheme.typography.labelSmall,
@@ -307,8 +315,14 @@ fun FlightDetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        // Price Forecast (if available)
-                        if (offer.priceIntelligence.predicted7d != null || offer.priceIntelligence.predicted14d != null) {
+                        // Price Forecast (if available). predicted7d/14d are
+                        // custom getters on PriceIntelligence (mapped from
+                        // backend forecast_7d_usd / forecast_14d_usd), so we
+                        // bind to locals first to let the compiler smart-cast
+                        // away the null checks inside the if-bodies.
+                        val predicted7d = offer.priceIntelligence.predicted7d
+                        val predicted14d = offer.priceIntelligence.predicted14d
+                        if (predicted7d != null || predicted14d != null) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -324,17 +338,17 @@ fun FlightDetailScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    if (offer.priceIntelligence.predicted7d != null) {
+                                    if (predicted7d != null) {
                                         ForecastBox(
                                             label = "+7 days",
-                                            price = offer.priceIntelligence.predicted7d,
+                                            price = predicted7d,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
-                                    if (offer.priceIntelligence.predicted14d != null) {
+                                    if (predicted14d != null) {
                                         ForecastBox(
                                             label = "+14 days",
-                                            price = offer.priceIntelligence.predicted14d,
+                                            price = predicted14d,
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
@@ -362,7 +376,7 @@ fun FlightDetailScreen(
                         )
 
                         DetailRow(
-                            icon = Icons.Default.BackpackRounded,
+                            icon = Icons.Default.Luggage,
                             label = "Baggage",
                             value = offer.baggageInfo.checkedBags
                         )
@@ -410,7 +424,7 @@ fun FlightDetailScreen(
                             .height(48.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.BellOutlined,
+                            imageVector = Icons.Default.NotificationsNone,
                             contentDescription = null,
                             modifier = Modifier
                                 .width(18.dp)
