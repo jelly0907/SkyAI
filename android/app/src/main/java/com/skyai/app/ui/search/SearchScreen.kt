@@ -53,8 +53,8 @@ import androidx.navigation.NavController
 import com.skyai.app.data.model.CabinClass
 import com.skyai.app.data.model.SearchResponse
 import com.skyai.app.data.model.TripType
+import com.skyai.app.data.repository.SearchResultsCache
 import com.skyai.app.ui.theme.SkyAITheme
-import com.google.gson.Gson
 import android.app.DatePickerDialog
 import java.util.Calendar
 
@@ -71,9 +71,13 @@ fun SearchScreen(
     LaunchedEffect(searchState) {
         when (searchState) {
             is SearchState.Success -> {
+                // Stash the response in process-scoped state and navigate by
+                // query_id only. Encoding a 50-offer SearchResponse as JSON
+                // and stuffing it into the route string blew past Android's
+                // nav-arg size limit and produced a blank Results screen.
                 val response = (searchState as SearchState.Success).response
-                val json = Gson().toJson(response)
-                navController.navigate("results/${java.net.URLEncoder.encode(json, "UTF-8")}")
+                SearchResultsCache.put(response)
+                navController.navigate("results/${response.queryId}")
             }
             else -> {}
         }

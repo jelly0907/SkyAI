@@ -19,6 +19,7 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.google.gson.Gson
 import com.skyai.app.data.model.*
+import com.skyai.app.data.repository.SearchResultsCache
 import com.skyai.app.ui.detail.FlightDetailScreen
 import com.skyai.app.ui.home.HomeScreen
 import com.skyai.app.ui.onboarding.OnboardingScreen
@@ -202,16 +203,17 @@ fun SkyAINavGraph(
 
         // ── Results ───────────────────────────────────────────────────────
 
+        // Routes pass IDs only; the actual SearchResponse / FlightOffer is
+        // looked up from SearchResultsCache. Previously we serialized the
+        // whole 50-offer response into the route string, which blew past
+        // Android's nav-arg size budget — `navigate()` silently failed and
+        // the destination rendered blank.
         composable(
-            route = "results/{requestJson}",
-            arguments = listOf(navArgument("requestJson") { type = NavType.StringType })
+            route = "results/{queryId}",
+            arguments = listOf(navArgument("queryId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val json     = backStackEntry.arguments?.getString("requestJson")
-            val response = json?.let {
-                runCatching {
-                    gson.fromJson(URLDecoder.decode(it, "UTF-8"), SearchResponse::class.java)
-                }.getOrNull()
-            }
+            val queryId  = backStackEntry.arguments?.getString("queryId")
+            val response = queryId?.let { SearchResultsCache.get(it) }
             if (response != null) {
                 val viewModel: ResultsViewModel = hiltViewModel()
                 ResultsScreen(
@@ -225,15 +227,11 @@ fun SkyAINavGraph(
         // ── Flight Detail ─────────────────────────────────────────────────
 
         composable(
-            route = "detail/{offerJson}",
-            arguments = listOf(navArgument("offerJson") { type = NavType.StringType })
+            route = "detail/{offerId}",
+            arguments = listOf(navArgument("offerId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val json  = backStackEntry.arguments?.getString("offerJson")
-            val offer = json?.let {
-                runCatching {
-                    gson.fromJson(URLDecoder.decode(it, "UTF-8"), FlightOffer::class.java)
-                }.getOrNull()
-            }
+            val offerId = backStackEntry.arguments?.getString("offerId")
+            val offer   = offerId?.let { SearchResultsCache.getOffer(it) }
             if (offer != null) {
                 FlightDetailScreen(navController = navController, offer = offer)
             }
@@ -241,16 +239,14 @@ fun SkyAINavGraph(
     }
 }
 
-// ── Nav helper ────────────────────────────────────────────────────────────────
+// ── Nav helpers ───────────────────────────────────────────────────────────────
+// Stash the payload in SearchResultsCache; route by ID only.
 
 fun NavController.navigateToResults(response: SearchResponse) {
-    val json    = Gson().toJson(response)
-    val encoded = URLEncoder.encode(json, "UTF-8")
-    navigate("results/$encoded")
+    SearchResultsCache.put(response)
+    navigate("results/${response.queryId}")
 }
 
 fun NavController.navigateToDetail(offer: FlightOffer) {
-    val json    = Gson().toJson(offer)
-    val encoded = URLEncoder.encode(json, "UTF-8")
-    navigate("detail/$encoded")
+    navigate("detail/${offer.offerId}")
 }

@@ -227,8 +227,9 @@ fun ResultsScreen(
                                 FlightCard(
                                     offer = offer,
                                     onSelectFlight = {
-                                        val json = Gson().toJson(offer)
-                                        navController.navigate("detail/${java.net.URLEncoder.encode(json, "UTF-8")}")
+                                        // Detail nav routes by offer_id only;
+                                        // the offer is already in SearchResultsCache.
+                                        navController.navigate("detail/${offer.offerId}")
                                     }
                                 )
                             }
