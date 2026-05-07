@@ -362,13 +362,6 @@ async def search_flights(
     to the price history database for future ML training.
     """
     provider = getattr(request.app.state, "provider", "mock")
-    req_id = uuid.uuid4().hex[:8]
-    t0 = datetime.now(timezone.utc)
-    logger.info(
-        "[search %s] start: %s→%s %s adults=%d cabin=%s provider=%s",
-        req_id, body.origin, body.destination, body.departure_date,
-        body.adults, body.cabin_class.value, provider,
-    )
 
     try:
         if provider == "mock":
@@ -378,30 +371,20 @@ async def search_flights(
             client = request.app.state.flight_client
             offers = await client.search_flights(body)
     except Exception as e:
-        logger.exception(f"[search {req_id}] provider call failed ({provider}): {e}")
+        logger.exception("Flight search failed (%s): %s", provider, e)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Flight search failed: {str(e)}",
         )
-    t_provider = (datetime.now(timezone.utc) - t0).total_seconds()
-    logger.info("[search %s] provider returned %d offers in %.2fs",
-                req_id, len(offers), t_provider)
 
-    # Run offers through the Price Intelligence engine. Mock-only by default
-    # (see price_intel/provider.py); DB provider is opt-in via PRICE_INTEL_USE_DB.
+    # Enrich with Price Intelligence. Mock-only by default; DBRouteStatsProvider
+    # kicks in once price_observations has ≥10 rows for the route+cabin.
     engine = get_price_intel_engine()
-    t_pi_start = datetime.now(timezone.utc)
     offers = await engine.enrich_offers(offers, body.departure_date)
-    t_pi = (datetime.now(timezone.utc) - t_pi_start).total_seconds()
-    logger.info("[search %s] price-intel enriched in %.2fs", req_id, t_pi)
 
-    # Log every offer as a price observation. Scheduled as a background task
-    # so the user-facing response returns immediately.
+    # Persist offers as price observations on a background task so the response
+    # never waits on the bulk insert.
     background_tasks.add_task(_log_observations, offers, body, provider)
-
-    total = (datetime.now(timezone.utc) - t0).total_seconds()
-    logger.info("[search %s] done in %.2fs (provider=%.2fs intel=%.2fs)",
-                req_id, total, t_provider, t_pi)
 
     return SearchResponse(
         query_id=str(uuid.uuid4()),

@@ -15,7 +15,11 @@ data class SearchFormState(
     val children: Int = 0,
     val infants: Int = 0,
     val cabinClass: CabinClass = CabinClass.ECONOMY,
-    val directOnly: Boolean = false,
+    // Defaulting to true papers over an unresolved edge case: searches with
+    // multi-stop offers in the response sometimes don't render results on
+    // Android. Nonstop searches always work end-to-end. Flip back to false
+    // once the multi-stop render bug is identified and fixed.
+    val directOnly: Boolean = true,
     val tripType: TripType = TripType.ROUNDTRIP,
     val showStructuredForm: Boolean = false
 )
