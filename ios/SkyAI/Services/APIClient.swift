@@ -125,39 +125,36 @@ private enum BackendError {
 // MARK: - Dev backend host
 //
 // On a physical iPhone, "localhost" resolves to the phone itself, so we
-// have to reach the Mac by name or IP. We resolve via Bonjour/mDNS
-// (<hostname>.local) so the URL keeps working when DHCP reshuffles the
-// Mac's IP — no more editing this file every time the network blips.
+// have to reach the Mac by name or IP. We previously used a Bonjour/mDNS
+// name (Stones-MacBook-Air.local) so the URL would survive DHCP changes,
+// but that caused stuck network requests in practice: macOS Continuity
+// publishes the Mac on multiple interfaces (Wi-Fi en0 + AWDL anpi0), mDNS
+// returned addresses for all of them, and iOS's Happy Eyeballs sometimes
+// bound to the AWDL peer-to-peer path which then hung on connection
+// cleanup. Hitting the Wi-Fi IP literal forces a single clean path
+// through your router.
 //
-// To find your Mac's mDNS name, run this in Terminal on the Mac:
+// To find the right IP, run this on the Mac:
 //
-//     scutil --get LocalHostName
+//     ipconfig getifaddr en0
 //
-// Then set MAC_HOSTNAME below to that exact value (without ".local" — we
-// append it). For example, if `scutil` prints "Jerrys-MacBook-Pro", set
-// `MAC_HOSTNAME = "Jerrys-MacBook-Pro"`.
+// Then set MAC_LAN_IP below to that exact value. Update it whenever DHCP
+// rotates your Mac's address (rare on a typical home network).
 //
 // Caveats:
-//   • mDNS only works on the LAN. Cellular / hotspot won't resolve .local.
-//   • The Simulator already shares the Mac's networking, so we just hit
-//     127.0.0.1 there — no Bonjour roundtrip needed.
-//   • If .local resolution ever fails on-device, fall back to your Mac's
-//     IP literal (`ipconfig getifaddr en0`) by editing `deviceBaseURL`.
-//
-// Info.plist requirements (already in place since plain-HTTP IP requests
-// are working today): App Transport Security must allow HTTP to the local
-// network — typically `NSAppTransportSecurity → NSAllowsLocalNetworking`
-// or `NSAllowsArbitraryLoads`. The local-network privacy prompt is also
-// already granted because the previous IP-based config triggered it.
+//   • Only works when the iPhone is on the same LAN as the Mac.
+//   • The Simulator shares the Mac's networking, so we hit 127.0.0.1 there.
+//   • Info.plist must allow cleartext HTTP to the local network — already
+//     in place since the previous IP-based config worked.
 
-private let MAC_HOSTNAME = "Stones-MacBook-Air"   // output of `scutil --get LocalHostName`
+private let MAC_LAN_IP = "192.168.86.49"   // output of `ipconfig getifaddr en0`
 private let DEV_BACKEND_PORT = 8000
 
 private func defaultDevBaseURL() -> URL {
     #if targetEnvironment(simulator)
     return URL(string: "http://127.0.0.1:\(DEV_BACKEND_PORT)")!
     #else
-    return URL(string: "http://\(MAC_HOSTNAME).local:\(DEV_BACKEND_PORT)")!
+    return URL(string: "http://\(MAC_LAN_IP):\(DEV_BACKEND_PORT)")!
     #endif
 }
 
@@ -379,5 +376,79 @@ actor APIClient {
             endpoint: "/search/flights",
             body: body
         )
+    }
+
+    // MARK: - Watch endpoints
+    //
+    // Mirrors backend/routes/watch.py:
+    //   POST   /watch                — create
+    //   GET    /watch?user_id=...    — list for a user
+    //   DELETE /watch/{id}           — cancel (204 No Content)
+    //   POST   /watch/{id}/check     — run one price check now
+
+    func createWatch(_ request: WatchCreateRequest) async throws -> WatchResponse {
+        let encoder = makeJSONEncoder()
+        let body = try encoder.encode(request)
+        return try await performRequest(
+            method: "POST",
+            endpoint: "/watch",
+            body: body
+        )
+    }
+
+    func listWatches(userId: String, activeOnly: Bool = false) async throws -> [WatchResponse] {
+        // Build the query manually because `performRequest` takes the endpoint
+        // as a single string. URLComponents handles encoding of the user_id
+        // value, which can contain anything down the road.
+        var components = URLComponents()
+        components.path = "/watch"
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: userId),
+            URLQueryItem(name: "active_only", value: activeOnly ? "true" : "false"),
+        ]
+        let endpoint = components.string ?? "/watch?user_id=\(userId)"
+        return try await performRequest(method: "GET", endpoint: endpoint)
+    }
+
+    func checkWatch(id: String) async throws -> WatchCheckResponse {
+        return try await performRequest(
+            method: "POST",
+            endpoint: "/watch/\(id)/check"
+        )
+    }
+
+    /// DELETE /watch/{id} — backend returns 204 No Content with an empty body,
+    /// so we can't route through `performRequest` (which insists on decoding
+    /// a response into `T`). Do the request inline; treat any 2xx as success.
+    func deleteWatch(id: String) async throws {
+        guard let url = URL(string: "/watch/\(id)", relativeTo: baseURL) else {
+            throw SkyAIError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        do {
+            let (_, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw SkyAIError.unknown
+            }
+            switch http.statusCode {
+            case 200..<300:
+                return
+            case 404:
+                throw SkyAIError.notFound("Watch not found.")
+            case 500...599:
+                throw SkyAIError.serverError("Failed to cancel watch — please try again.")
+            default:
+                throw SkyAIError.serverOther(http.statusCode, "Unexpected error (HTTP \(http.statusCode)).")
+            }
+        } catch let urlErr as URLError {
+            throw SkyAIError.networkError(urlErr)
+        } catch let err as SkyAIError {
+            throw err
+        } catch {
+            throw SkyAIError.unknown
+        }
     }
 }

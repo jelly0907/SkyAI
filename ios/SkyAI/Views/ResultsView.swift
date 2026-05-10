@@ -77,7 +77,15 @@ struct ResultsView: View {
                         ScrollView {
                             LazyVStack(spacing: 12) {
                                 ForEach(viewModel.offers) { offer in
-                                    NavigationLink(destination: FlightDetailView(offer: offer)) {
+                                    NavigationLink(
+                                        destination: FlightDetailView(
+                                            offer: offer,
+                                            // Pass the search request through so the
+                                            // detail screen's "Watch this price" action
+                                            // can preserve the original adults / cabin.
+                                            searchRequest: searchRequest
+                                        )
+                                    ) {
                                         FlightCardView(offer: offer)
                                     }
                                 }

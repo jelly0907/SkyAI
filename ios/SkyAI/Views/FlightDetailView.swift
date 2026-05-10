@@ -2,7 +2,21 @@ import SwiftUI
 
 struct FlightDetailView: View {
     let offer: FlightOffer
+    /// Optional — the search request that produced this offer. Used to
+    /// preserve `adults`, `cabinClass`, `tripType` etc. when creating a
+    /// price watch from this screen. When nil (older call sites that
+    /// haven't been updated, or previews) we fall back to defaults.
+    var searchRequest: SearchRequest? = nil
+
     @Environment(\.dismiss) var dismiss
+
+    // Watch-this-price state. We talk to APIClient directly instead of
+    // taking a WatchlistViewModel dependency: the Watchlist tab refreshes
+    // itself on appear, so a fire-and-forget create here is enough — no
+    // need for the two screens to share state.
+    @State private var isWatching: Bool = false
+    @State private var watchConfirmation: String?
+    @State private var watchError: String?
 
     private let primaryColor = Color(red: 0.1, green: 0.235, blue: 0.42)
     private let accentColor = Color(red: 1.0, green: 0.42, blue: 0.21)
@@ -29,6 +43,32 @@ struct FlightDetailView: View {
                             }
 
                             Spacer()
+
+                            // "Watch this price" — POST /watch with the offer's
+                            // route/dates/cabin, target = current price. Goes
+                            // into the Watchlist tab on next refresh.
+                            Button {
+                                Task { await watchThisPrice() }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if isWatching {
+                                        ProgressView()
+                                            .progressViewStyle(.circular)
+                                            .tint(.white)
+                                            .scaleEffect(0.8)
+                                    } else {
+                                        Image(systemName: "bell.badge.fill")
+                                        Text("Watch")
+                                    }
+                                }
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(accentColor)
+                                .cornerRadius(20)
+                            }
+                            .disabled(isWatching)
                         }
 
                         Text("Flight Details")
@@ -260,6 +300,82 @@ struct FlightDetailView: View {
                 }
         }
         .navigationBarBackButtonHidden(true)
+        // Watch-creation feedback. Two separate alerts so we can distinguish
+        // the success path (auto-dismissable confirmation) from the failure
+        // path (might need a retry).
+        .alert(
+            "Watching this price",
+            isPresented: Binding(
+                get: { watchConfirmation != nil },
+                set: { if !$0 { watchConfirmation = nil } }
+            )
+        ) {
+            Button("OK") { watchConfirmation = nil }
+        } message: {
+            Text(watchConfirmation ?? "")
+        }
+        .alert(
+            "Couldn't create the watch",
+            isPresented: Binding(
+                get: { watchError != nil },
+                set: { if !$0 { watchError = nil } }
+            )
+        ) {
+            Button("OK") { watchError = nil }
+        } message: {
+            Text(watchError ?? "")
+        }
+    }
+
+    // MARK: - Watch this price
+
+    private func watchThisPrice() async {
+        guard let firstSegment = offer.outbound.segments.first,
+              let lastSegment  = offer.outbound.segments.last
+        else {
+            watchError = "This offer is missing flight info."
+            return
+        }
+        // Roundtrip return date = the inbound's first-segment departure date.
+        // For a one-way the offer has only an outbound itinerary and the
+        // request will pass nil here, which the backend accepts.
+        let returnDate = offer.inbound?.segments.first?.departureAt
+
+        // Carry the original passenger count and cabin class from the
+        // search that produced this offer, so the alert tracks the same
+        // shopping intent. Falls back to single-adult / segment-cabin if
+        // the caller didn't pass a search request (e.g. previews).
+        let adults     = searchRequest?.adults     ?? 1
+        let cabinClass = searchRequest?.cabinClass ?? firstSegment.cabin
+
+        let request = WatchCreateRequest(
+            userId: "demo-user",
+            origin: firstSegment.origin,
+            destination: lastSegment.destination,
+            departureDate: firstSegment.departureAt,
+            returnDate: returnDate,
+            cabinClass: cabinClass,
+            adults: adults,
+            maxStops: nil,
+            targetPriceUsd: offer.priceBreakdown.totalUsd,
+            notifyOnGreatDeal: true
+        )
+
+        isWatching = true
+        defer { isWatching = false }
+        do {
+            let watch = try await APIClient.shared.createWatch(request)
+            let target = Int(watch.targetPriceUsd ?? offer.priceBreakdown.totalUsd)
+            watchConfirmation =
+                "We'll alert you the moment \(watch.origin) → \(watch.destination) "
+                + "drops to or below $\(target). "
+                + "See it in the Watchlist tab."
+        } catch let err as SkyAIError {
+            watchError = err.errorDescription
+                ?? "Couldn't create the watch. Please try again."
+        } catch {
+            watchError = "Couldn't create the watch. Please try again."
+        }
     }
 
     private var trendIcon: String {
