@@ -2,9 +2,17 @@
 
 _Last updated: 2026-05-10_
 
-A multi-agent flight finder that combines real flight inventory with a
-data-driven recommendation layer. Three components: iOS app, Android
-app, FastAPI backend. Live Duffel sandbox data drives everything.
+A flight finder with a data-driven recommendation layer. Three
+components: iOS app, Android app, FastAPI backend. Live Duffel sandbox
+data drives everything.
+
+> **Note on "multi-agent" framing.** The original project scaffold
+> used the phrase "multi-agent flight finder backend." The current
+> implementation is rule-based, not agentic — natural-language
+> parsing, price classification, and trend logic are all deterministic
+> Python. A genuine multi-agent architecture (search-intent agent,
+> deal-hunter agent, advisor agent, watcher agent) is captured as
+> Phase 4 work in [`ROADMAP.md`](./ROADMAP.md).
 
 For forward-looking work, see [`ROADMAP.md`](./ROADMAP.md).
 
@@ -163,6 +171,101 @@ same `WatchResponse` schema. The two clients are interchangeable from
 the server's perspective, which means a price watch created from iOS
 shows up unchanged in Android and vice versa once both clients point
 at the same backend.
+
+---
+
+## Planned: multi-agent architecture
+
+_Not implemented yet — captured here so the product direction is
+visible alongside what's shipped. Tracked as Phase 4 in
+[`ROADMAP.md`](./ROADMAP.md)._
+
+Each rule-based component above has a natural successor that wraps it
+in an LLM agent with tools and reasoning. Four agents are planned:
+
+### Search-Intent Agent
+
+**Replaces**: today's regex-based natural-language parser.
+
+**Capability**: handles messy, compound, or ambiguous queries the
+current parser can't:
+
+- "flights for my anniversary, somewhere warm in March, $800 max"
+- "I want to be in Tokyo by April 5 — find me the cheapest way there
+  from anywhere on the West Coast"
+- "same trip as last time but a week later"
+
+Takes free-text input plus user-profile context (home airports,
+search history) and produces one or more structured `SearchRequest`s
+via tool calls. Asks clarifying questions when needed ("Tokyo HND or
+NRT?", "departing which day?"). Can fan out to parallel searches for
+"from anywhere on the West Coast" style queries.
+
+### Deal-Hunter Agent
+
+**New capability** — no rule-based equivalent today.
+
+**Capability**: autonomously expands the search space after the
+user's primary search returns, surfacing alternatives the user didn't
+ask for but would value:
+
+- Nearby-airport substitutes ("JFK is what you searched, but LGA is
+  $80 cheaper")
+- Shifted-date arbitrage ("leaving one day later saves $140")
+- Connection arbitrage ("JFK→AMS + €30 train to London is $200
+  cheaper than JFK→LHR direct")
+- Layovers as features ("an 18hr layover in Reykjavík doubles as a
+  free stopover trip")
+
+Surfaces 2–4 ranked alternatives. Runs async so the primary results
+stay snappy.
+
+### Advisor Agent
+
+**Replaces**: today's templated `action_reason` strings ("Prices are
+trending falling — act now").
+
+**Capability**: generates prose tailored to this specific offer + this
+user's stated constraints + the route's historical context. Surfaces
+uncertainty honestly. Example:
+
+> "This is one of the lowest fares I've seen on this route since
+> December. The trend has been falling for three weeks but is starting
+> to flatten — I'd book within 48 hours. Worth noting: this fare is
+> non-refundable and the connection in Reykjavík is tight at 50 min.
+> The next-cheapest refundable option is $90 more."
+
+### Watcher Agent
+
+**Replaces**: today's deterministic `/watch/{id}/check` flow.
+
+**Capability**: smarter alerts. Decides when to re-check (more often
+when the route's market is volatile), what threshold variations are
+worth surfacing, and when to evolve a watch that's stuck:
+
+- "You set $400, but $420 just appeared and is genuinely a steal —
+  should I alert anyway?"
+- "Your target hasn't been hit in 6 weeks. The realistic floor for
+  this route looks closer to $480 — want me to suggest a few
+  alternatives?"
+- "A nearby-airport substitution would save you ~$60 — should I add
+  it to your watchlist?"
+
+### Why all four are deferred
+
+Three real constraints, none of them code-difficulty:
+
+- **LLM cost**: at ~5,000 searches/day with one or two LLM calls each,
+  ~$50–100/mo at current pricing. Worth it after product-market fit,
+  not before.
+- **Latency**: today's `/search/flights` returns in ~5 sec. Inline LLM
+  calls add 1–3 sec. Acceptable for the async Advisor/Deal-Hunter
+  paths; tougher for Search-Intent (which the user is actively
+  waiting on). Mitigations: caching, smaller models for time-critical
+  steps, streaming partial results.
+- **Evaluation**: agentic flows are hard to test deterministically.
+  Need a golden set of queries with expected outcomes before this
+  ships, so we don't regress quietly.
 
 ---
 

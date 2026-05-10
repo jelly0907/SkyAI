@@ -440,6 +440,140 @@ they're worth capturing.
 
 ---
 
+## Track 4 — Multi-agent architecture (Phase 4, conceptual)
+
+The project name and original scaffold framed SkyAI as a "multi-agent
+flight finder," but the current implementation is rule-based —
+deterministic Python in `routes/search.py` (NL parser), `price_intel/`
+(classifier + percentile math), and `duffel_client.py` (REST wrapper).
+No LLM is in the request path today.
+
+The natural evolution is to wrap each rule-based component in an LLM
+agent that has tools, can reason, and can collaborate with the others.
+What follows is the conceptual target — not scoped, not estimated, but
+captured here so the architectural intent isn't lost.
+
+### A. Search-Intent Agent
+
+**Replaces**: the regex parser in
+`backend/routes/search.py:_parse_natural_language`.
+
+**Why it matters**: the current parser handles "JFK to LHR next
+Friday" but breaks on anything ambiguous or compound. Real users type
+things like:
+
+- "flights for my anniversary, somewhere warm in March, $800 max"
+- "I want to be in Tokyo by April 5 — find me the cheapest way there
+  from anywhere on the West Coast"
+- "same trip as last time but a week later"
+
+**What it does**: takes free-text input + optional user profile
+context (preferred home airports, past searches), produces a
+structured `SearchRequest` via tool calls. Asks clarifying questions
+when the request is ambiguous (e.g. "Tokyo HND or NRT?", "departing
+which day specifically?"). May produce multiple `SearchRequest`
+candidates and run them in parallel for "from anywhere on the West
+Coast" style queries.
+
+**Implementation sketch**: Claude or GPT-4 with a structured-output
+tool that emits `SearchRequest` JSON; conversation state stored
+server-side keyed by user.
+
+---
+
+### B. Deal-Hunter Agent
+
+**New capability** (no rule-based equivalent today).
+
+**Why it matters**: today the user has to know what they're looking
+for. A Deal-Hunter agent autonomously expands the search space and
+surfaces options the user didn't ask for but would value.
+
+**What it does**: given a search the user just ran, considers
+alternatives:
+
+- Nearby airports ("JFK is what you searched, but LGA is $80 cheaper")
+- Shifted dates ("leaving one day later saves $140")
+- Connection arbitrage ("JFK→AMS + €30 train to London is $200 cheaper
+  than JFK→LHR direct")
+- Multi-stop layovers as features ("an 18hr layover in Reykjavík
+  doubles as a free stopover trip")
+
+Surfaces 2–4 alternatives ranked by savings + effort. Runs
+asynchronously after the user's primary search returns.
+
+**Implementation sketch**: an LLM with tools for `search_flights`,
+`get_nearby_airports`, `compute_alternative_routings`, and access to
+the price-intelligence engine.
+
+---
+
+### C. Advisor Agent
+
+**Replaces / augments**: the rule-based `_choose_action()` in
+`backend/price_intel/rules.py` (today it produces a one-paragraph
+`action_reason` from string templates).
+
+**Why it matters**: the rule-based reasons are correct but feel
+templated ("Prices are trending falling — act now"). An Advisor agent
+generates prose that's specific to this offer and contextually aware
+("This is one of the lowest fares I've seen on this route since
+December. The trend has been falling for three weeks but is starting
+to flatten — I'd book within 48 hours.").
+
+**What it does**: takes a `FlightOffer` + its `PriceIntelligence` +
+the user's stated constraints + history, produces a recommendation
+with prose explanation. Surfaces uncertainty honestly ("I have limited
+data for this route — confidence is low").
+
+**Implementation sketch**: same LLM, called per-offer at enrichment
+time (or only on the top N offers for cost reasons), with tools for
+the underlying stats.
+
+---
+
+### D. Watcher Agent
+
+**Replaces**: the deterministic `/watch/{id}/check` flow in
+`backend/routes/watch.py`.
+
+**Why it matters**: today watches fire on simple criteria (price ≤
+target, or label is STEAL/GREAT_DEAL). A Watcher agent would decide
+when to check (price volatility heuristics — more often when the
+market is moving), what threshold variations to test ("you set $400,
+but $420 just appeared and is genuinely a steal — should I alert?"),
+and whether to evolve the watch over time ("your target hasn't been
+hit in 6 weeks — want me to suggest realistic alternatives?").
+
+**What it does**: runs in the scheduled background loop (Track 2 / B
+covers the loop itself), evaluates each active watch, decides whether
+to trigger / suggest / quietly continue.
+
+**Implementation sketch**: agent invoked per active watch on each
+scheduler tick, with tools for `search_flights`, `classify_price`,
+`get_watch_history`, `send_notification`.
+
+---
+
+### Cross-cutting concerns for Track 4
+
+- **LLM provider**: Claude (via Anthropic API) or GPT-4 (OpenAI API).
+  Pick one to start; abstract behind an interface so the swap is
+  cheap.
+- **Cost**: this is the main reason Track 4 is deferred. At ~5,000
+  searches/day with two LLM calls each, expect ~$50–100/mo at current
+  pricing. Worth it only after there's product-market fit.
+- **Latency**: today's `/search/flights` returns in ~5 sec end-to-end.
+  Adding an LLM call inline adds 1–3 sec. Acceptable for the Advisor
+  agent path; not acceptable for Search-Intent (which the user is
+  actively waiting on). Mitigation: cache aggressively, stream
+  partial results, use a smaller/faster model for time-sensitive
+  steps.
+- **Eval**: agentic flows are hard to test deterministically.
+  Establish a golden set of queries + expected outcomes early.
+
+---
+
 ## Current state
 
 _As of 2026-05-10._
